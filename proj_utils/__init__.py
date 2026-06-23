@@ -112,11 +112,14 @@ N_Newton = 0
 #   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher)
 # Outputs:
 #   probs_returned is all nine oscillation probabilities: e.g. probs_returned[1][0] is mu->e
-def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
+def _Probability_Matter_LBL(E, osc_params, osc_channel_ids=[]):
   # --------------------------------------------------------------------- #
   # First calculate useful simple functions of the oscillation parameters #
   # --------------------------------------------------------------------- #
 
+  if len(osc_channel_ids) == 0:
+    return np.array([])
+  
   L = osc_params["experimental_baseline_km"]
   s12sq = osc_params["s12sq"]
   s13sq = osc_params["s13sq"]
@@ -124,14 +127,6 @@ def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
   delta = osc_params["delta"]
   Dmsq21 = osc_params["Dmsq21"]
   Dmsq31 = osc_params["Dmsq31"]
-
-  osc_channels_id = []
-
-  for oc in osc_channels:
-    if oc == "numu_survival":
-      osc_channels_id.append((1,1))
-    if oc == "nue_appearance":
-      osc_channels_id.append((1,0))
   
   c13sq = 1 - s13sq
 
@@ -254,7 +249,7 @@ def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
     
   probs_returned = []
 
-  for ch in osc_channels_id:
+  for ch in osc_channel_ids:
       if ch[0] == 0:
           if ch[1] == 0:
               probs_returned.append(Pee)
@@ -277,3 +272,115 @@ def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
           elif ch[1] == 2:
               probs_returned.append(1 - (1 - Pee - (Pme_CPC - Pme_CPV)) - (1 - (Pme_CPC + Pme_CPV) - Pmm))
   return probs_returned
+
+def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
+  
+  nu_osc_channel_ids = []
+  antinu_osc_channel_ids = []
+  return_order = []
+  
+  for i, oc in enumerate(osc_channels):
+    if oc == "numu_survival":
+      nu_osc_channel_ids.append((1,1))
+      return_order.append(len(nu_osc_channel_ids))
+    if oc == "nue_appearance":
+      nu_osc_channel_ids.append((1,0))
+      return_order.append(len(nu_osc_channel_ids))
+    if oc == "antinumu_survival":
+      antinu_osc_channel_ids.append((1,1))
+      return_order.append(-len(antinu_osc_channel_ids))
+    if oc == "antinue_appearance":
+      antinu_osc_channel_ids.append((1,0))
+      return_order.append(-len(antinu_osc_channel_ids))
+
+  nu_probs = _Probability_Matter_LBL(E, osc_params, nu_osc_channel_ids)
+  antinu_probs = _Probability_Matter_LBL(-E, osc_params, antinu_osc_channel_ids)
+
+  return_probs = np.empty((len(return_order), E.shape[0]))
+
+  for i, idx in enumerate(return_order):
+    if idx > 0:
+      return_probs[i,:] = nu_probs[idx-1]
+    else:
+      return_probs[i,:] = antinu_probs[abs(idx)-1]    
+
+  return return_probs.squeeze()
+
+
+from matplotlib.widgets import Slider
+
+def InteractiveOscProbPlot(Es, osc_params):
+  var_params = osc_params.copy()
+  
+  numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
+    Probability_Matter_LBL(Es, var_params, 
+                           osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
+
+  fig = plt.figure(figsize=(8, 5))
+    
+  axl = fig.add_axes((0.1,0.3,0.39,0.65))
+  numu_surv_prob_l, = axl.plot(Es, numu_surv_prob)
+  antinumu_surv_prob_l, = axl.plot(Es, antinumu_surv_prob, ls="dashed")
+  axl.set_xlabel(r"$E_{\nu}$ [GeV]", size="x-large")
+  axl.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mu}$", size="x-large")
+  axl.set_ylim([0,1])
+  
+  axr = fig.add_axes((0.6,0.3,0.39,0.65))
+  nue_surv_prob_l, = axr.plot(Es, nue_app_prob, label=r"neutrino")
+  antinue_surv_prob_l, = axr.plot(Es, antinue_app_prob, ls="dashed", label=r"antineutrino")
+  axr.set_xlabel(r"$E_{\nu}$ [GeV]", size="x-large")
+  axr.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mathrm{e}}$", size="x-large")
+  axr.set_ylim([0,0.15])
+  axr.legend()
+
+  axdmsq31 = fig.add_axes((0.25, 0.1, 0.5, 0.03))
+  dmsq31_slider = Slider(
+      ax=axdmsq31,
+      label=r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]",
+      valmin=2.3,
+      valmax=2.7,
+      valinit=osc_params["Dmsq31"]*1E3,
+  )
+  
+  axs23sq = fig.add_axes((0.25, 0.05, 0.5, 0.03))
+  s23sq_slider = Slider(
+      ax=axs23sq,
+      label=r"$\mathrm{sin}^{2}(\theta_{23})$",
+      valmin=0.4,
+      valmax=0.7,
+      valinit=osc_params["s23sq"],
+  )
+  
+  axdelta = fig.add_axes((0.25, 0, 0.5, 0.03))
+  delta_slider = Slider(
+      ax=axdelta,
+      label=r"$\delta_\mathrm{CP}/\pi$",
+      valmin=-1,
+      valmax=1,
+      valinit=osc_params["delta"]/np.pi,
+  )
+  
+  # The function to be called anytime a slider's value changes
+  def update(val):
+      var_params["Dmsq31"] = dmsq31_slider.val * 1E-3
+      var_params["s23sq"] = s23sq_slider.val
+      var_params["delta"] = delta_slider.val * np.pi
+      
+      numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
+          Probability_Matter_LBL(Es, var_params, 
+                             osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
+  
+      numu_surv_prob_l.set_ydata(numu_surv_prob)
+      antinumu_surv_prob_l.set_ydata(antinumu_surv_prob)
+      nue_surv_prob_l.set_ydata(nue_app_prob)
+      antinue_surv_prob_l.set_ydata(antinue_app_prob)
+      
+      fig.canvas.draw_idle()
+  
+  
+  # register the update function with each slider
+  dmsq31_slider.on_changed(update)
+  s23sq_slider.on_changed(update)
+  delta_slider.on_changed(update)
+
+  return fig
