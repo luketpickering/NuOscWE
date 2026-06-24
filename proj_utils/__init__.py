@@ -54,14 +54,14 @@ def ReconstructedNeutrinoEnergy(df, params={}):
   
   erec = 0
   if muon_Eres > 0:
-      erec += np.where(df["pid_lep"] == 13, np.random.normal(df["E_lepton"], muon_Eres*df["E_lepton"]), 0)
+      erec += np.where(df["pid_lepton"] == 13, np.random.normal(df["E_lepton"], muon_Eres*df["E_lepton"]), 0)
   else:
-      erec += np.where(df["pid_lep"] == 13, df["E_lepton"], 0)
+      erec += np.where(df["pid_lepton"] == 13, df["E_lepton"], 0)
 
   if electron_Eres > 0:
-      erec += np.where(df["pid_lep"] == 11, np.random.normal(df["E_lepton"], electron_Eres*df["E_lepton"]),0)
+      erec += np.where(df["pid_lepton"] == 11, np.random.normal(df["E_lepton"], electron_Eres*df["E_lepton"]),0)
   else:
-      erec += np.where(df["pid_lep"] == 11, df["E_lepton"], 0)
+      erec += np.where(df["pid_lepton"] == 11, df["E_lepton"], 0)
   
   if proton_Tres > 0:
       erec += np.random.normal(df["T_proton"], proton_Tres*df["T_proton"])
@@ -342,7 +342,7 @@ def InteractiveOscProbPlot(osc_params):
   alpha = 0.2
 
   def norm(x, loc, scale):
-    return (1.0/(np.sqrt(2*np.pi)*scale)) * np.exp(-np.power(x-loc,2)/np.power(scale,2))
+    return (1.0/(scale*np.sqrt(2*np.pi))) * np.exp(-np.power(x-loc,2)/(2*np.power(scale,2)))
   
   nu_unosc_evr = norm(Es, loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"]) \
                    /norm(Energy_Distribution_GeV["peak"], loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"])
