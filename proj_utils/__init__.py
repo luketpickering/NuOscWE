@@ -2,6 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import newton
 
+def _norm(x, loc, scale):
+    return (1.0/(scale*np.sqrt(2*np.pi))) * np.exp(-np.power(x-loc,2)/(2*np.power(scale,2)))  
+
+def drawgaus(num_samples, loc, scale, bins):
+  bin_width = (bins[-1] - bins[0])/(bins.shape[0]-1)
+  g_scaling_factor = bin_width * num_samples
+  values = np.linspace(bins[0], bins[-1], 1000)
+  plt.plot(values, _norm(values, loc=loc, scale=scale)*g_scaling_factor, label=r"$g(x)$")
+
 def _pois_interval_Wald(c):
     return c - newton(lambda ll: ll + np.sqrt(ll) - c,c), newton(lambda lh: lh - np.sqrt(lh) - c,c) - c
 
@@ -9,9 +18,14 @@ def _pois_intervals(counts):
     l = []
     h = []
     for c in counts:
-        a, b = pois_interval_Wald(c)
+      # print(c)
+      # if c > 0:
+        a, b = _pois_interval_Wald(c)
         l.append(a)
         h.append(b)
+      # else:
+      #   l.append(0)
+      #   h.append(0)
     return [l,h]
 
 def hist1d(data, bins, weights=None):
@@ -341,11 +355,8 @@ def InteractiveOscProbPlot(osc_params):
 
   alpha = 0.2
 
-  def norm(x, loc, scale):
-    return (1.0/(scale*np.sqrt(2*np.pi))) * np.exp(-np.power(x-loc,2)/(2*np.power(scale,2)))
-  
-  nu_unosc_evr = norm(Es, loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"]) \
-                   /norm(Energy_Distribution_GeV["peak"], loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"])
+  nu_unosc_evr = _norm(Es, loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"]) \
+                   /_norm(Energy_Distribution_GeV["peak"], loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"])
   antinu_unosc_evr = nu_unosc_evr*0.3
 
   axpl = InteractiveOscProbPlot_fig.add_axes((0.1,0.725,0.39,0.26))
@@ -478,3 +489,153 @@ def InteractiveOscProbPlot(osc_params):
   s13sq_slider.on_changed(update)
   s23sq_slider.on_changed(update)
   delta_slider.on_changed(update)
+
+import pandas as pa
+
+def draw_comp_h1():
+  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
+
+  osc_params = {
+    "experimental_baseline_km": 1300,
+    "s12sq": 0.31,
+    "s13sq": 0.02,
+    "s23sq": 0.55,
+    "delta": 0.7 * np.pi,
+    "Dmsq21": 7.5e-5,
+    "Dmsq31": 2.5e-3
+  }
+  
+  events_nu_nue_cc = simulated_events_nu_mode[simulated_events_nu_mode["pid_lepton"] == 11]
+
+  start = 0
+  stop = 8
+  nbins = 15
+  num = nbins + 1
+  
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h1 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=np.linspace(start=start, stop=stop, num=num))
+
+  osc_params["Dmsq31"] = 2.8e-3
+
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h2 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=np.linspace(start=start, stop=stop, num=num))
+  
+  drawhist1d(hist=h1, color="#AA3377", label=r"Hist A")
+  drawhist1d(hist=h2, color="#4477AA", label=r"Hist B")
+
+  plt.xlabel(r"$x$", size="x-large")
+  plt.ylabel(r"Count (Arbitrary Units)", size="x-large")
+  plt.legend(fontsize="large")
+  
+  plt.tight_layout()
+  plt.show()
+
+def draw_comp_h2():
+  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
+
+  osc_params = {
+    "experimental_baseline_km": 1300,
+    "s12sq": 0.31,
+    "s13sq": 0.02,
+    "s23sq": 0.55,
+    "delta": 0.7 * np.pi,
+    "Dmsq21": 7.5e-5,
+    "Dmsq31": 2.5e-3
+  }
+  
+  events_nu_nue_cc = simulated_events_nu_mode[simulated_events_nu_mode["pid_lepton"] == 11]
+
+  start = 0
+  stop = 8
+  nbins = 15
+  num = nbins + 1
+  
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h1 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=np.linspace(start=start, stop=stop, num=num))
+
+  osc_params["s13sq"] = 0.021
+
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h3 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=np.linspace(start=start, stop=stop, num=num))
+  
+  drawhist1d(hist=h1, color="#AA3377", label=r"Hist A")
+  drawhist1d(hist=h3, color="#EE6677", label=r"Hist C")
+
+  plt.xlabel(r"$x$", size="x-large")
+  plt.ylabel(r"Count (Arbitrary Units)", size="x-large")
+  plt.legend(fontsize="large")
+  
+  plt.tight_layout()
+  plt.show()
+
+def draw_comp_h3():
+  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
+
+  osc_params = {
+    "experimental_baseline_km": 1300,
+    "s12sq": 0.31,
+    "s13sq": 0.02,
+    "s23sq": 0.55,
+    "delta": 0.7 * np.pi,
+    "Dmsq21": 7.5e-5,
+    "Dmsq31": 2.5e-3
+  }
+  
+  events_nu_nue_cc = simulated_events_nu_mode[simulated_events_nu_mode["pid_lepton"] == 11]
+
+  start = 0
+  stop = 8
+  nbins = 15
+  num = nbins + 1
+
+  bins = np.linspace(start=start, stop=stop, num=num)
+  
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h1 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=bins)
+
+  osc_params["Dmsq31"] = 2.8e-3
+
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h2 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=bins)
+
+  osc_params["Dmsq31"] = 2.5e-3
+  osc_params["s13sq"] = 0.021
+
+  event_osc_weights_nue_app = \
+          Probability_Matter_LBL(events_nu_nue_cc["E_neutrino"], osc_params, osc_channels=["nue_appearance"])
+  h3 = hist1d(data=events_nu_nue_cc["E_neutrino"], weights=event_osc_weights_nue_app, bins=bins)
+  
+  
+  fig, (axl,axr) = plt.subplots(1,2, figsize=(8, 4))
+
+  plt.sca(axl)
+  
+  drawhist1d(hist=h1, color="#AA3377", label=r"Hist A")
+
+  bin_centers = (bins[1:] + bins[:-1])/2
+  
+  drawhist1d(hist=h2, color="#4477AA", label=r"Hist B")
+  axl.errorbar(bin_centers, h2[0], yerr=_pois_intervals(h2[0]*10),  color="#4477AA", lw=0, elinewidth=1)
+
+  axl.set_xlabel(r"$x$", size="x-large")
+  axl.set_ylabel(r"Count (Arbitrary Units)", size="x-large")
+  axl.legend(fontsize="large")
+
+  plt.sca(axr)
+
+  drawhist1d(hist=h1, color="#AA3377", label=r"Hist A")
+  drawhist1d(hist=h3, color="#EE6677", label=r"Hist C")
+  axr.errorbar(bin_centers, h3[0], yerr=_pois_intervals(h3[0]/4),  color="#EE6677", lw=0, elinewidth=1)
+
+  axr.set_xlabel(r"$x$", size="x-large")
+  axr.set_ylabel(r"Count (Arbitrary Units)", size="x-large")
+  axr.legend(fontsize="large")
+  
+  plt.tight_layout()
+  plt.show()
