@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import newton
 
+import pandas as pa
+
+simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
+
 def _norm(x, loc, scale):
     return (1.0/(scale*np.sqrt(2*np.pi))) * np.exp(-np.power(x-loc,2)/(2*np.power(scale,2)))  
 
@@ -55,7 +59,7 @@ def drawhist1d(*, hist=None, data=None, bins=None, weights=None, **kwargs):
     else:
         raise RuntimeError("Must pass either hist= or data= arguments")
 
-    plt.gca().stairs(counts, bins, **kwargs)
+    return plt.gca().stairs(counts, bins, **kwargs)
 
 def ReconstructedNeutrinoEnergy(df, params={}):
 
@@ -490,10 +494,7 @@ def InteractiveOscProbPlot(osc_params):
   s23sq_slider.on_changed(update)
   delta_slider.on_changed(update)
 
-import pandas as pa
-
 def draw_comp_h1():
-  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
 
   osc_params = {
     "experimental_baseline_km": 1300,
@@ -533,7 +534,6 @@ def draw_comp_h1():
   plt.show()
 
 def draw_comp_h2():
-  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
 
   osc_params = {
     "experimental_baseline_km": 1300,
@@ -573,7 +573,6 @@ def draw_comp_h2():
   plt.show()
 
 def draw_comp_h3():
-  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
 
   osc_params = {
     "experimental_baseline_km": 1300,
@@ -640,8 +639,8 @@ def draw_comp_h3():
   plt.tight_layout()
   plt.show()
 
-def draw_comp_h4():
-  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
+
+def _comp_h4_binvalues():
 
   osc_params = {
     "experimental_baseline_km": 1300,
@@ -670,15 +669,24 @@ def draw_comp_h4():
           Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
   h1 = hist1d(data=events_nu_numu_cc["E_neutrino"][:nsamples], weights=event_osc_weights_numu_surv[:nsamples], bins=bins)
 
-  osc_params["Dmsq31"] = 2.8e-3
+  osc_params["Dmsq31"] = 2.65e-3
 
   event_osc_weights_numu_surv = \
           Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
   h2 = hist1d(data=events_nu_numu_cc["E_neutrino"], weights=event_osc_weights_numu_surv*sf, bins=bins)
   
+  return h1, h2
+
+def comp_h4_binvalues():
+  h1, h2 = _comp_h4_binvalues()
+  return h1[0], h2[0]
+
+def draw_comp_h4():
+  h1, h2 = _comp_h4_binvalues()
+  
   drawhist1d(hist=h1, color="#AA3377", lw=2, label=r"Observation")
 
-  bin_centers = (bins[1:] + bins[:-1])/2
+  bin_centers = (h1[1][1:] + h1[1][:-1])/2
   
   drawhist1d(hist=h2, color="#4477AA", lw=2, label=r"Model Prediction")
   plt.errorbar(bin_centers, h2[0], yerr=np.sqrt(h2[0]),  color="#4477AA", lw=0, elinewidth=1)
@@ -689,3 +697,103 @@ def draw_comp_h4():
 
   plt.tight_layout()
   plt.show()
+
+
+InteractiveLikelihoodScan_fig = None
+def InteractiveLikelihoodScan():
+  global InteractiveLikelihoodScan_fig
+  if InteractiveLikelihoodScan_fig is not None:
+    plt.close(InteractiveLikelihoodScan_fig)
+
+  InteractiveLikelihoodScan_fig = plt.figure(figsize=(6, 4))
+
+  osc_params = {
+    "experimental_baseline_km": 1300,
+    "s12sq": 0.31,
+    "s13sq": 0.02,
+    "s23sq": 0.55,
+    "delta": 0.7 * np.pi,
+    "Dmsq21": 7.5e-5,
+    "Dmsq31": 2.5e-3
+  }
+  
+  colors = {
+    "numu": "#AA3377",
+    "nue": "#4477AA",
+    "antinumu": "#EE6677",
+    "antinue": "#66CCEE",
+  }
+  
+  events_nu_numu_cc = simulated_events_nu_mode[simulated_events_nu_mode["pid_lepton"] == 13]
+
+  nsamples = 10000
+  nevs = events_nu_numu_cc.shape[0]
+  sf = nsamples/float(nevs)
+  
+  start = 0.25
+  stop = 8
+  nbins = 50
+  num = nbins + 1
+
+  bins = np.linspace(start=start, stop=stop, num=num)
+  
+  event_osc_weights_numu_surv = \
+          Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
+  h1 = hist1d(data=events_nu_numu_cc["E_neutrino"][:nsamples], weights=event_osc_weights_numu_surv[:nsamples], bins=bins)
+
+  axpl = InteractiveLikelihoodScan_fig.add_axes((0.1,0.725,0.39,0.26))
+
+  InteractiveLikelihoodScan_fig.sca(axpl)
+  
+  drawhist1d(hist=h1, color="#AA3377", lw=2, label=r"Observation")
+
+  osc_params["Dmsq31"] = 2.65e-3
+
+  event_osc_weights_numu_surv = \
+          Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
+  h2 = hist1d(data=events_nu_numu_cc["E_neutrino"], weights=event_osc_weights_numu_surv*sf, bins=bins)
+
+  numu_surv_pred_l = drawhist1d(hist=h2, color="#4477AA", lw=2, label=r"Model Prediction")
+  # bin_centers = (bins[1:] + bins[:-1])/2 
+  # plt.errorbar(bin_centers, h2[0], yerr=np.sqrt(h2[0]),  color="#4477AA", lw=0, elinewidth=1)
+  
+  axpl.set_xlabel(r"$E_{\nu}$ [GeV]", size="large")
+  axpl.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mu}$", size="x-large")
+  axpl.set_ylim([0,320])
+  axpl.legend()
+  
+  # axpr = InteractiveLikelihoodScan_fig.add_axes((0.6,0.725,0.39,0.26))
+  # numu_unosc_evr_lo_r = axpr.fill_between(Es, nu_unosc_evr*0.3*0.9, np.zeros_like(Es), fc="grey", alpha=0.1)
+  # nue_surv_prob_lo, = axpr.plot(Es, nue_app_prob, c=colors["nue"], alpha=alpha)
+  # nue_surv_prob_l, = axpr.plot(Es, nue_app_prob, c=colors["nue"], label=r"electron neutrino")
+  # antinue_surv_prob_lo, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], alpha=alpha, ls="dashed")
+  # antinue_surv_prob_l, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], ls="dashed", label=r"electron antineutrino")
+  # axpr.set_xlabel(r"$E_{\nu}$ [GeV]", size="large")
+  # axpr.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mathrm{e}}$", size="large")
+  # axpr.set_ylim([0,0.3])
+  # axpr.legend()
+
+  axdmsq31 = InteractiveLikelihoodScan_fig.add_axes((0.25, 0.55, 0.5, 0.03))
+  dmsq31_slider = Slider(
+      ax=axdmsq31,
+      label=r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]",
+      valmin=2.3,
+      valmax=2.7,
+      valinit=osc_params["Dmsq31"]*1E3,
+  )
+  
+  # The function to be called anytime a slider's value changes
+  def update(val):
+      var_params["Dmsq31"] = dmsq31_slider.val * 1E-3
+      
+      # numu_surv_prob = Probability_Matter_LBL(Es, var_params, 
+      #                        osc_channels=["numu_survival"])
+      # h2 = hist1d(data=events_nu_numu_cc["E_neutrino"], weights=numu_surv_prob*sf, bins=bins)
+    
+      # numu_surv_pred_l.set_ydata(h2[0])
+      
+      InteractiveOscProbPlot_fig.canvas.draw_idle()
+  
+  
+  # register the update function with each slider
+  dmsq31_slider.on_changed(update)
