@@ -38,3 +38,6 @@ def Poisson_N2LLH(data_hist, predicted_hist):
     pred_no0 = predicted_hist[0][data_hist[0] != 0]
     data_no0 = data_hist[0][data_hist[0] != 0]
     return 2*np.sum(pred_no0 - data_no0 + data_no0 * np.log(data_no0/pred_no0))
+
+def Pearson_N2LLH(data_hist, predicted_hist):
+    return np.sum(np.power(predicted_hist - data_hist,2)/data_hist)
