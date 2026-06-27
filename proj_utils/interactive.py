@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import ipywidgets as widgets
+from ipywidgets import FloatSlider, Label, VBox, HBox, Layout
 
 from .NuFast import *
 from .stats import *
@@ -22,7 +22,7 @@ def InteractiveOscProbPlot(osc_params):
   
   Min_E_GeV = Energy_Distribution_GeV["peak"] - 3 * Energy_Distribution_GeV["width"]
   Min_E_GeV = Min_E_GeV if Min_E_GeV > 0 else Energy_Distribution_GeV["peak"]/5
-  Max_E_GeV = Energy_Distribution_GeV["peak"] + 5 * Energy_Distribution_GeV["width"]
+  Max_E_GeV = Energy_Distribution_GeV["peak"] + 3 * Energy_Distribution_GeV["width"]
 
   Es = np.linspace(Min_E_GeV, Max_E_GeV,1000)
   
@@ -33,7 +33,9 @@ def InteractiveOscProbPlot(osc_params):
                            osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
 
   plt.ioff()
-  InteractiveOscProbPlot_fig, axes = plt.subplots(nrows=2, ncols=2)
+  InteractiveOscProbPlot_fig, axes = plt.subplots(nrows=2, ncols=2, \
+                                                  gridspec_kw=dict(left=0.1,bottom=0.1, top=0.99, wspace=0.3,hspace=0.3), \
+                                                  figsize=(8,5))
   InteractiveOscProbPlot_fig.canvas.toolbar_visible = False
   
   axpl, axpr, axel, axer = axes.flatten()
@@ -60,7 +62,7 @@ def InteractiveOscProbPlot(osc_params):
   antinue_surv_prob_lo, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], alpha=alpha, ls="dashed")
   antinue_surv_prob_l, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], ls="dashed", label=r"electron antineutrino")
   axpr.set_xlabel(r"$E_{\nu}$ [GeV]", size="large")
-  axpr.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mathrm{e}}$", size="large")
+  axpr.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mathrm{e}}$", size="x-large")
   axpr.set_ylim([0,0.3])
   axpr.legend()
 
@@ -83,96 +85,58 @@ def InteractiveOscProbPlot(osc_params):
   axer.set_ylim([0, axel_ymax])
   axer.legend()
 
-  dmsq31_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]",
-    value=osc_params["Dmsq31"]*1E3,
-    min=2.3,
-    max=2.7,
-    step=(2.7-2.3)/100
-  )
-  dmsq21_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\Delta\mathrm{m}_{21}^{2}$ [$10^{-5}$ eV]",
-    value=osc_params["Dmsq21"]*1E5,
-    min=6,
-    max=9,
-    step=(9-6)/100
-  )
+  controls_spec = [
+    dict( pname = "Dmsq31", srange = [2.3, 2.7], sf = 1E3, desc = r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]" ),
+    dict( pname = "Dmsq21", srange = [6, 9], sf = 1E5, desc = r"$\Delta\mathrm{m}_{21}^{2}$ [$10^{-5}$ eV]" ),
+    dict( pname = "delta", srange = [-1, 1], sf = 1.0/np.pi, desc = "$\delta_\mathrm{CP}/\pi$" ),
 
-  s12sq_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\mathrm{sin}^{2}(\theta_{12})$",
-    value=osc_params["s12sq"],
-    min=0.25,
-    max=0.36,
-    step=(0.36-0.25)/100
-  )
-  s13sq_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\mathrm{sin}^{2}(\theta_{13})$",
-    value=osc_params["s13sq"],
-    min=0.015,
-    max=0.025,
-    step=(0.025-0.015)/100
-  )
-  s23sq_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\mathrm{sin}^{2}(\theta_{23})$",
-    value=osc_params["s23sq"],
-    min=0.4,
-    max=0.7,
-    step=(0.7-0.4)/100
-  )
-  
-  delta_slider = widgets.FloatSlider(
-    orientation='horizontal',
-    description=r"$\delta_\mathrm{CP}/\pi$",
-    value=osc_params["delta"]/np.pi,
-    min=-1,
-    max=1,
-    step=(1+1)/100
-  )
-  
-  display(InteractiveOscProbPlot_fig.canvas)
-  display(dmsq31_slider)
-  display(dmsq21_slider)
-  display(s12sq_slider)
-  display(s13sq_slider)
-  display(s23sq_slider)
-  display(delta_slider)
+    dict( pname = "s12sq", srange = [2.5, 3.6], sf = 10, desc = r"$\mathrm{sin}^{2}(\theta_{12})$ [$10^{-1}$]" ),
+    dict( pname = "s13sq", srange = [1, 2.5], sf = 1E2, desc = r"$\mathrm{sin}^{2}(\theta_{13})$ [$10^{-2}$]" ),
+    dict( pname = "s23sq", srange = [4, 7], sf = 10, desc = r"$\mathrm{sin}^{2}(\theta_{23})$ [$10^{-1}$]" ),
+  ]
+
+  sliders = []
+  controls = []
+
+  for c in controls_spec:
+    sliders.append(FloatSlider(orientation='horizontal',
+                               value=osc_params[c["pname"]]*c["sf"],
+                               min=c["srange"][0],
+                               max=c["srange"][1],
+                               step=(c["srange"][1]-c["srange"][0])/100
+                              ))
+    controls.append(HBox([Label(c["desc"]), sliders[-1]]))
   
   def update(val):
-      var_params["Dmsq31"] = dmsq31_slider.value * 1E-3
-      var_params["Dmsq21"] = dmsq21_slider.value * 1E-5
-      var_params["s12sq"] = s12sq_slider.value
-      var_params["s13sq"] = s13sq_slider.value
-      var_params["s23sq"] = s23sq_slider.value
-      var_params["delta"] = delta_slider.value * np.pi
+    for i,c in enumerate(controls_spec):
+      var_params[c["pname"]] = sliders[i].value / c["sf"]
       
-      numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
-          Probability_Matter_LBL(Es, var_params, 
-                             osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
-  
-      numu_surv_prob_l.set_ydata(numu_surv_prob)
-      antinumu_surv_prob_l.set_ydata(antinumu_surv_prob)
-      nue_surv_prob_l.set_ydata(nue_app_prob)
-      antinue_surv_prob_l.set_ydata(antinue_app_prob)
+    numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
+        Probability_Matter_LBL(Es, var_params, 
+                               osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
+    
+    numu_surv_prob_l.set_ydata(numu_surv_prob)
+    antinumu_surv_prob_l.set_ydata(antinumu_surv_prob)
+    nue_surv_prob_l.set_ydata(nue_app_prob)
+    antinue_surv_prob_l.set_ydata(antinue_app_prob)
+    
+    numu_surv_evr_l.set_ydata(numu_surv_prob*nu_unosc_evr)
+    nue_app_evr_l.set_ydata(nue_app_prob*nu_unosc_evr)
+    antinumu_surv_evr_l.set_ydata(antinumu_surv_prob*antinu_unosc_evr)
+    antinue_app_evr_l.set_ydata(antinue_app_prob*antinu_unosc_evr)
+    
+    InteractiveOscProbPlot_fig.canvas.draw_idle()
 
-      numu_surv_evr_l.set_ydata(numu_surv_prob*nu_unosc_evr)
-      nue_app_evr_l.set_ydata(nue_app_prob*nu_unosc_evr)
-      antinumu_surv_evr_l.set_ydata(antinumu_surv_prob*antinu_unosc_evr)
-      antinue_app_evr_l.set_ydata(antinue_app_prob*antinu_unosc_evr)
-      
-      InteractiveOscProbPlot_fig.canvas.draw_idle()
-  
-  dmsq31_slider.observe(update)
-  dmsq21_slider.observe(update)
-  s12sq_slider.observe(update)
-  s13sq_slider.observe(update)
-  s23sq_slider.observe(update)
-  delta_slider.observe(update)
+  for s in sliders:
+    s.observe(update)
 
+  control_container = HBox([
+    VBox([controls[i] for i in range(3)],layout=Layout(align_items="flex-end")),
+    VBox([controls[i+3] for i in range(3)],layout=Layout(align_items="flex-end")),
+  ],layout=Layout(justify_content="flex-start"))
+  
+  display(InteractiveOscProbPlot_fig.canvas)
+  display(control_container)
 
 InteractiveLikelihoodScan_fig = None
 def InteractiveLikelihoodScan():
