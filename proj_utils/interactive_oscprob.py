@@ -7,23 +7,37 @@ from .NuFast import *
 from .stats import *
 
 InteractiveOscProbPlot_fig = None
+InteractiveBiProbPlot_fig = None
 def InteractiveOscProbPlot(osc_params):
-  global InteractiveOscProbPlot_fig
+  global InteractiveOscProbPlot_fig, InteractiveBiProbPlot_fig
   if InteractiveOscProbPlot_fig is not None:
     plt.close(InteractiveOscProbPlot_fig)
+
+  if InteractiveBiProbPlot_fig is not None:
+    plt.close(InteractiveBiProbPlot_fig)
 
   colors = {
     "numu": "#AA3377",
     "nue": "#4477AA",
     "antinumu": "#EE6677",
     "antinue": "#66CCEE",
+    "E0": "#FEE391",
+    "E1": "#FB9A29",
+    "E2": "#CC4C02",
   }
   
   Energy_Distribution_GeV = osc_params["experimental_energy_distribution"]
-  
-  Min_E_GeV = Energy_Distribution_GeV["peak"] - 3 * Energy_Distribution_GeV["width"]
-  Min_E_GeV = Min_E_GeV if Min_E_GeV > 0 else Energy_Distribution_GeV["peak"]/5
-  Max_E_GeV = Energy_Distribution_GeV["peak"] + 3 * Energy_Distribution_GeV["width"]
+
+  if "range" in Energy_Distribution_GeV:
+    Min_E_GeV, Max_E_GeV = Energy_Distribution_GeV["range"]
+    
+  else:
+    Min_E_GeV = Energy_Distribution_GeV["peak"] - 3 * Energy_Distribution_GeV["width"]
+    Min_E_GeV = Min_E_GeV if Min_E_GeV > 0 else Energy_Distribution_GeV["peak"]/5
+    Max_E_GeV = Energy_Distribution_GeV["peak"] + 3 * Energy_Distribution_GeV["width"]
+
+  EPeak = osc_params["experimental_energy_distribution"]["peak"]
+  EWidth = osc_params["experimental_energy_distribution"]["width"]
 
   Es = np.linspace(Min_E_GeV, Max_E_GeV,1000)
   
@@ -38,10 +52,13 @@ def InteractiveOscProbPlot(osc_params):
                                                   gridspec_kw=dict(left=0.1,bottom=0.1, top=0.99, wspace=0.3,hspace=0.3), \
                                                   figsize=(8,5))
   InteractiveOscProbPlot_fig.canvas.toolbar_visible = False
+
+  InteractiveBiProbPlot_fig, bpax = plt.subplots(figsize=(5,5))
+  InteractiveBiProbPlot_fig.canvas.toolbar_visible = False
   
   axpl, axpr, axel, axer = axes.flatten()
   
-  alpha = 0.2
+  alpha = 0.3
 
   nu_unosc_evr = gaus(Es, loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"]) \
                    /gaus(Energy_Distribution_GeV["peak"], loc=Energy_Distribution_GeV["peak"], scale=Energy_Distribution_GeV["width"])
@@ -62,6 +79,11 @@ def InteractiveOscProbPlot(osc_params):
   nue_surv_prob_l, = axpr.plot(Es, nue_app_prob, c=colors["nue"], label=r"electron neutrino")
   antinue_surv_prob_lo, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], alpha=alpha, ls="dashed")
   antinue_surv_prob_l, = axpr.plot(Es, antinue_app_prob, c=colors["antinue"], ls="dashed", label=r"electron antineutrino")
+
+  axpr.plot([EPeak-EWidth,EPeak-EWidth],[0, 0.125], c=colors["E0"], alpha=0.5)
+  axpr.plot([EPeak,EPeak],[0, 0.125], c=colors["E1"], alpha=0.5)
+  axpr.plot([EPeak+EWidth,EPeak+EWidth],[0, 0.125], c=colors["E2"], alpha=0.5)
+
   axpr.set_xlabel(r"$E_{\nu}$ [GeV]", size="large")
   axpr.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mathrm{e}}$", size="x-large")
   axpr.set_ylim([0,0.3])
@@ -86,6 +108,47 @@ def InteractiveOscProbPlot(osc_params):
   axer.set_ylim([0, axel_ymax])
   axer.legend()
 
+  biprob_dcp_vals = np.linspace(-np.pi, np.pi, 25)
+  def biprob(E, osc_params):
+    nue_app_biprob = []
+    antinue_app_biprob = []
+    vop = osc_params.copy()
+
+    onue_app_prob, oantinue_app_prob = Probability_Matter_LBL(E, vop, 
+                                                              osc_channels=["nue_appearance", "antinue_appearance"])
+    
+    for v in biprob_dcp_vals:
+      vop["delta"] = v
+      nue_app_prob, antinue_app_prob = Probability_Matter_LBL(E, vop, 
+                                                              osc_channels=["nue_appearance", "antinue_appearance"])
+      nue_app_biprob.append(nue_app_prob)
+      antinue_app_biprob.append(antinue_app_prob)
+    return ([onue_app_prob], [oantinue_app_prob], nue_app_biprob, antinue_app_biprob)
+
+  onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak-EWidth,var_params)
+  bp_ovalE0_lo, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E0"], alpha=alpha)
+  bp_ovalE0_l, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E0"], label=f"{EPeak-EWidth:.2} GeV")
+  bp_ovalE0_po, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000", alpha=alpha)
+  bp_ovalE0_p, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000")
+
+  onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak,var_params)
+  bp_ovalE1_lo, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E1"], alpha=alpha)
+  bp_ovalE1_l, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E1"], label=f"{EPeak:.2} GeV")
+  bp_ovalE1_po, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000", alpha=alpha)
+  bp_ovalE1_p, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000")
+
+  onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak+EWidth,var_params)
+  bp_ovalE2_lo, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E2"], alpha=alpha)
+  bp_ovalE2_l, = bpax.plot(nue_app_biprob, antinue_app_biprob, c=colors["E2"], label=f"{EPeak+EWidth:.2} GeV")
+  bp_ovalE2_po, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000", alpha=alpha)
+  bp_ovalE2_p, = bpax.plot(onue_app_prob, oantinue_app_prob, "o", c="#FF0000",label=r"Current $\delta_\mathrm{CP}$ Value")
+  
+  bpax.set_xlabel(f"Electron Neutrino Appearance Probability")
+  bpax.set_ylabel(f"Electron Antieutrino Appearance Probability")
+  bpax.set_ylim([0,0.125])
+  bpax.set_xlim([0,0.125])
+  bpax.legend()
+  
   controls_spec = [
     dict( pname = "Dmsq31", srange = [2.3, 2.7], sf = 1E3, desc = r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]" ),
     dict( pname = "Dmsq21", srange = [6, 9], sf = 1E5, desc = r"$\Delta\mathrm{m}_{21}^{2}$ [$10^{-5}$ eV]" ),
@@ -125,136 +188,36 @@ def InteractiveOscProbPlot(osc_params):
     nue_app_evr_l.set_ydata(nue_app_prob*nu_unosc_evr)
     antinumu_surv_evr_l.set_ydata(antinumu_surv_prob*antinu_unosc_evr)
     antinue_app_evr_l.set_ydata(antinue_app_prob*antinu_unosc_evr)
+
+    onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak-EWidth,var_params)
+    bp_ovalE0_l.set_xdata(nue_app_biprob)
+    bp_ovalE0_l.set_ydata(antinue_app_biprob)
+    bp_ovalE0_p.set_xdata(onue_app_prob)
+    bp_ovalE0_p.set_ydata(oantinue_app_prob)
+
+    onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak,var_params)
+    bp_ovalE1_l.set_xdata(nue_app_biprob)
+    bp_ovalE1_l.set_ydata(antinue_app_biprob)
+    bp_ovalE1_p.set_xdata(onue_app_prob)
+    bp_ovalE1_p.set_ydata(oantinue_app_prob)
+
+    onue_app_prob, oantinue_app_prob, nue_app_biprob, antinue_app_biprob = biprob(EPeak+EWidth,var_params)
+    bp_ovalE2_l.set_xdata(nue_app_biprob)
+    bp_ovalE2_l.set_ydata(antinue_app_biprob)
+    bp_ovalE2_p.set_xdata(onue_app_prob)
+    bp_ovalE2_p.set_ydata(oantinue_app_prob)
     
     InteractiveOscProbPlot_fig.canvas.draw_idle()
+    InteractiveBiProbPlot_fig.canvas.draw_idle()
 
   for s in sliders:
     s.observe(update)
 
+  plot_container = HBox([InteractiveOscProbPlot_fig.canvas,InteractiveBiProbPlot_fig.canvas])
   control_container = HBox([
     VBox([controls[i] for i in range(3)],layout=Layout(align_items="flex-end")),
     VBox([controls[i+3] for i in range(3)],layout=Layout(align_items="flex-end")),
   ],layout=Layout(justify_content="flex-start"))
   
-  display(InteractiveOscProbPlot_fig.canvas)
+  display(plot_container)
   display(control_container)
-
-InteractiveLikelihoodScan_fig = None
-def InteractiveLikelihoodScan():
-  global InteractiveLikelihoodScan_fig
-  if InteractiveLikelihoodScan_fig is not None:
-    plt.close(InteractiveLikelihoodScan_fig)
-
-  osc_params = {
-    "experimental_baseline_km": 1300,
-    "s12sq": 0.31,
-    "s13sq": 0.02,
-    "s23sq": 0.55,
-    "delta": 0.7 * np.pi,
-    "Dmsq21": 7.5e-5,
-    "Dmsq31": 2.5e-3
-  }
-  
-  colors = {
-    "numu": "#AA3377",
-    "nue": "#4477AA",
-    "antinumu": "#EE6677",
-    "antinue": "#66CCEE",
-  }
-
-  simulated_events_nu_mode = pa.read_csv("simulation/neutrino_mode_events.csv")
-  events_nu_numu_cc = simulated_events_nu_mode[simulated_events_nu_mode["pid_lepton"] == 13]
-
-  nsamples = 10000
-  nevs = events_nu_numu_cc.shape[0]
-  sf = nsamples/float(nevs)
-  
-  start = 0.25
-  stop = 8
-  nbins = 50
-  num = nbins + 1
-
-  bins = np.linspace(start=start, stop=stop, num=num)
-  bin_centers = (bins[1:] + bins[:-1])/2 
-  
-  event_osc_weights_numu_surv = \
-          Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
-  h1 = hist1d(data=events_nu_numu_cc["E_neutrino"][:nsamples], weights=event_osc_weights_numu_surv[:nsamples], bins=bins)
-
-  plt.ioff()
-  InteractiveLikelihoodScan_fig, axes = plt.subplots(nrows=1, ncols=2, \
-                                                  gridspec_kw=dict(left=0.1,bottom=0.15, top=0.99, wspace=0.3,hspace=0.3), \
-                                                  figsize=(12,4))
-  InteractiveLikelihoodScan_fig.canvas.toolbar_visible = False
-  
-  axl, axr = axes.flatten()
-
-  axl.stairs(h1[0], h1[1], color="#AA3377", lw=2, label=r"Observation")
-  
-  osc_params["Dmsq31"] = 2.65e-3
-
-  event_osc_weights_numu_surv = \
-          Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], osc_params, osc_channels=["numu_survival"])
-  h2 = hist1d(data=events_nu_numu_cc["E_neutrino"], weights=event_osc_weights_numu_surv*sf, bins=bins)
-
-  pred_hist_l = axl.stairs(h2[0], h2[1], color="#4477AA", lw=2, label=r"Model Prediction")
-  pred_errs_l = axl.errorbar(bin_centers, h2[0], yerr=np.sqrt(h2[0]),  color="#4477AA", lw=0, elinewidth=1)
-  
-  axl.set_xlabel(r"$E_{\nu}$ [GeV]", size="large")
-  axl.set_ylabel(r"$P_{\nu_\mu \rightarrow \nu_\mu}$", size="x-large")
-  axl.set_ylim([0,320])
-  axl.legend()
-
-  controls_spec = [
-    dict( pname = "Dmsq31", srange = [2.3, 2.7], sf = 1E3, desc = r"$\Delta\mathrm{m}_{31}^{2}$ [$10^{-3}$ eV]" ),
-  ]
-
-  lhood_x = np.linspace(controls_spec[0]["srange"][0],controls_spec[0]["srange"][1], 51)
-  lhood_y = np.zeros_like(lhood_x)
-
-  lhood_l, = axr.plot(lhood_x,lhood_y, ".")
-  
-  axr.set_xlabel(controls_spec[0]["desc"], size="large")
-  axr.set_ylabel(r"$-2\log(\mathcal{L})$", size="x-large")
-  axr.set_ylim([-5,1000])
-  
-  sliders = []
-  controls = []
-
-  for c in controls_spec:
-    sliders.append(FloatSlider(orientation='horizontal',
-                               value=osc_params[c["pname"]]*c["sf"],
-                               min=c["srange"][0],
-                               max=c["srange"][1],
-                               step=(c["srange"][1]-c["srange"][0])/50
-                              ))
-    controls.append(HBox([Label(c["desc"]), sliders[-1]]))
-
-  var_params = osc_params.copy()
-  def update(val):
-    for i,c in enumerate(controls_spec):
-      var_params[c["pname"]] = sliders[i].value / c["sf"]
-      
-    event_osc_weights_numu_surv = \
-          Probability_Matter_LBL(events_nu_numu_cc["E_neutrino"], var_params, osc_channels=["numu_survival"])
-    h2 = hist1d(data=events_nu_numu_cc["E_neutrino"], weights=event_osc_weights_numu_surv*sf, bins=bins)
-
-    nonlocal pred_hist_l, pred_errs_l
-    pred_hist_l.remove()
-    pred_errs_l.remove()
-    
-    pred_hist_l = axl.stairs(h2[0], h2[1], color="#4477AA", lw=2, label=r"Model Prediction")
-    pred_errs_l = axl.errorbar(bin_centers, h2[0], yerr=np.sqrt(h2[0]),  color="#4477AA", lw=0, elinewidth=1)
-
-    lhood_i = np.argmax(lhood_x > sliders[i].value)
-    lhood_y[lhood_i] = Pearson_N2LLH(h1[0],h2[0])
-
-    lhood_l.set_ydata(lhood_y)
-    
-    InteractiveLikelihoodScan_fig.canvas.draw_idle()
-
-  for s in sliders:
-    s.observe(update)
-  
-  display(InteractiveLikelihoodScan_fig.canvas)
-  display(controls[0])

@@ -6,4 +6,5 @@ from .physics import *
 
 from .demos import *
 
-from .interactive import *
+from .interactive_oscprob import *
+from .interactive_lhoodscan import *

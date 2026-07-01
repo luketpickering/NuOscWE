@@ -186,6 +186,9 @@ def _Probability_Matter_LBL(E, osc_params, osc_channel_ids=[]):
   return probs_returned
 
 def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
+
+  if not hasattr(E, "__len__"): # doesn't have a length, assume scalar and wrap in an array
+    E = np.array([E])  
   
   nu_osc_channel_ids = []
   antinu_osc_channel_ids = []
