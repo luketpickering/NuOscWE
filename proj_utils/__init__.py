@@ -8,3 +8,8 @@ from .demos import *
 
 from .interactive_oscprob import *
 from .interactive_lhoodscan import *
+from .interactive_gaussfit import *
+
+from .iplotly import iPlotlyOsc
+
+ipo = iPlotlyOsc()

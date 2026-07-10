@@ -24,7 +24,7 @@ N_Newton = 0
 #   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher)
 # Outputs:
 #   probs_returned is all nine oscillation probabilities: e.g. probs_returned[1][0] is mu->e
-def _Probability_Matter_LBL(E, osc_params, osc_channel_ids=[]):
+def _Probability_Matter_LBL(E, L, osc_params, osc_channel_ids=[]):
   # --------------------------------------------------------------------- #
   # First calculate useful simple functions of the oscillation parameters #
   # --------------------------------------------------------------------- #
@@ -32,7 +32,6 @@ def _Probability_Matter_LBL(E, osc_params, osc_channel_ids=[]):
   if len(osc_channel_ids) == 0:
     return np.array([])
   
-  L = osc_params["experimental_baseline_km"]
   s12sq = osc_params["s12sq"]
   s13sq = osc_params["s13sq"]
   s23sq = osc_params["s23sq"]
@@ -185,7 +184,7 @@ def _Probability_Matter_LBL(E, osc_params, osc_channel_ids=[]):
               probs_returned.append(1 - (1 - Pee - (Pme_CPC - Pme_CPV)) - (1 - (Pme_CPC + Pme_CPV) - Pmm))
   return probs_returned
 
-def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
+def Probability_Matter_LBL(E, L, osc_params, osc_channels=[]):
 
   if not hasattr(E, "__len__"): # doesn't have a length, assume scalar and wrap in an array
     E = np.array([E])  
@@ -208,8 +207,8 @@ def Probability_Matter_LBL(E, osc_params, osc_channels=[]):
       antinu_osc_channel_ids.append((1,0))
       return_order.append(-len(antinu_osc_channel_ids))
 
-  nu_probs = _Probability_Matter_LBL(E, osc_params, nu_osc_channel_ids)
-  antinu_probs = _Probability_Matter_LBL(-E, osc_params, antinu_osc_channel_ids)
+  nu_probs = _Probability_Matter_LBL(E, L, osc_params, nu_osc_channel_ids)
+  antinu_probs = _Probability_Matter_LBL(-E, L, osc_params, antinu_osc_channel_ids)
 
   return_probs = np.empty((len(return_order), E.shape[0]))
 

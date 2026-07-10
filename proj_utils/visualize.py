@@ -3,11 +3,16 @@ import matplotlib.pyplot as plt
 
 from .stats import gaus
 
-def drawgaus(num_samples, loc, scale, bins):
+def get_scaled_gaus(num_samples, loc, scale, bins):
   bin_width = (bins[-1] - bins[0])/(bins.shape[0]-1)
   g_scaling_factor = bin_width * num_samples
   values = np.linspace(bins[0], bins[-1], 1000)
-  plt.plot(values, gaus(values, loc=loc, scale=scale)*g_scaling_factor, label=r"$g(x)$")
+  return (values, gaus(values, loc=loc, scale=scale)*g_scaling_factor)
+
+def drawgaus(num_samples, loc, scale, bins, **kwargs):
+  x,g = get_scaled_gaus(num_samples, loc, scale, bins)
+  label = r"$g(x)$" if "label" not in kwargs else kwargs["label"]
+  return plt.plot(x, g, label=label)
 
 def drawhist1d(*, hist=None, data=None, bins=None, weights=None, **kwargs):
     if data is not None:
