@@ -200,11 +200,17 @@ def Probability_Matter_LBL(E, L, osc_params, osc_channels=[]):
     if oc == "nue_appearance":
       nu_osc_channel_ids.append((1,0))
       return_order.append(len(nu_osc_channel_ids))
+    if oc == "nutau_appearance":
+      nu_osc_channel_ids.append((1,2))
+      return_order.append(len(nu_osc_channel_ids))
     if oc == "antinumu_survival":
       antinu_osc_channel_ids.append((1,1))
       return_order.append(-len(antinu_osc_channel_ids))
     if oc == "antinue_appearance":
       antinu_osc_channel_ids.append((1,0))
+      return_order.append(-len(antinu_osc_channel_ids))
+    if oc == "antinutau_appearance":
+      antinu_osc_channel_ids.append((1,2))
       return_order.append(-len(antinu_osc_channel_ids))
 
   nu_probs = _Probability_Matter_LBL(E, L, osc_params, nu_osc_channel_ids)

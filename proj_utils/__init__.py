@@ -12,4 +12,7 @@ from .interactive_gaussfit import *
 
 from .iplotly import iPlotlyOsc
 
+from .xsec import NumuCCTotInterp, NumubCCTotInterp
+from .flux import DUNENDNumu,NOvANDNumu,SKNumu
+
 ipo = iPlotlyOsc()

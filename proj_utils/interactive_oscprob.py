@@ -44,7 +44,7 @@ def InteractiveOscProbPlot(osc_params):
   var_params = osc_params.copy()
   
   numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
-    Probability_Matter_LBL(Es, var_params, 
+    Probability_Matter_LBL(Es, var_params["experimental_baseline_km"], var_params, 
                            osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
 
   plt.ioff()
@@ -114,12 +114,12 @@ def InteractiveOscProbPlot(osc_params):
     antinue_app_biprob = []
     vop = osc_params.copy()
 
-    onue_app_prob, oantinue_app_prob = Probability_Matter_LBL(E, vop, 
+    onue_app_prob, oantinue_app_prob = Probability_Matter_LBL(E, vop["experimental_baseline_km"], vop, 
                                                               osc_channels=["nue_appearance", "antinue_appearance"])
     
     for v in biprob_dcp_vals:
       vop["delta"] = v
-      nue_app_prob, antinue_app_prob = Probability_Matter_LBL(E, vop, 
+      nue_app_prob, antinue_app_prob = Probability_Matter_LBL(E, vop["experimental_baseline_km"], vop, 
                                                               osc_channels=["nue_appearance", "antinue_appearance"])
       nue_app_biprob.append(nue_app_prob)
       antinue_app_biprob.append(antinue_app_prob)
@@ -176,7 +176,7 @@ def InteractiveOscProbPlot(osc_params):
       var_params[c["pname"]] = sliders[i].value / c["sf"]
       
     numu_surv_prob, antinumu_surv_prob, nue_app_prob, antinue_app_prob = \
-        Probability_Matter_LBL(Es, var_params, 
+        Probability_Matter_LBL(Es, var_params["experimental_baseline_km"], var_params, 
                                osc_channels=["numu_survival", "antinumu_survival", "nue_appearance", "antinue_appearance"])
     
     numu_surv_prob_l.set_ydata(numu_surv_prob)
