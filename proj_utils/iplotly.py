@@ -354,62 +354,170 @@ class iPlotlyOsc:
     show_unosc.observe(update)
     show_surv.observe(update)
     incl_oors.observe(update)
-
-    toggle_btns = wdgt.VBox([ wdgt.Label("Visualisation Controls:"),
-                              wdgt.HBox([fixy, incl_oors], layout=wdgt.Layout(margin_top="2em")), 
-                              wdgt.HBox([show_unosc, show_surv], layout=wdgt.Layout(margin_top="2em"))],
-                            layout=wdgt.Layout(margin_top="2em"))
     
-    controls = ["s13sq", "s23sq", "Dmsq32", "Dmsq21", "delta", "gaussbeam_mu", "gaussbeam_w", "expt_baseline", "expt_mass"]
-    self.register_callback("evrate", controls, update)
-    return wdgt.HBox([ wdgt.VBox([self.figs["evrate"], self.figs["antievrate"]]), wdgt.VBox([self.get_control_box(controls), beam_selector, toggle_btns]) ])
+    osc_controls = ["s13sq", "s23sq", "Dmsq32", "Dmsq21", "delta"]
+    self.register_callback("evrate", osc_controls, update)
+    det_controls = ["expt_baseline", "expt_mass"]
+    self.register_callback("evrate", det_controls, update)
+    beam_controls = ["gaussbeam_mu", "gaussbeam_w"]
+    self.register_callback("evrate", beam_controls, update)
+    return wdgt.HBox([ wdgt.VBox([self.figs["evrate"], self.figs["antievrate"]]), 
+                       wdgt.VBox([wdgt.Label("Oscillation Parameters:"), self.get_control_box(osc_controls),
+                                  wdgt.Label("Detector Controls:"), self.get_control_box(det_controls),
+                                  wdgt.Label("Beam Controls:"), self.get_control_box(beam_controls), beam_selector, incl_oors,
+                                  wdgt.Label("Visualisation Controls:"),
+                                  wdgt.HBox([fixy, show_unosc, show_surv]) ]) ])
 
   def bievent(self):
 
-    def cdcp(beam, Es):
+    novpts = 40
+
+    ## 2 modes again, fixed energy with 3 energy sliders, or whole beam
+
+    def get_oval_points(Es, beam, do_integral=True):
       odcp = self.params["delta"]
-      nuer = beam(Es) * NumuCCTotInterp(Es)
-      nuebr = beam(Es) * NumubCCTotInterp(Es)
-      nue = np.zeros(51)
-      nueb = np.zeros(51)
-      
-      for i in range(51):
-        self.params["delta"] = -np.pi + 2*np.pi*(i/50)
-        nuep, nuebp = Probability_Matter_LBL(Es, self.params["expt_baseline"], self.params, 
-                                             osc_channels=["nue_appearance", "antinue_appearance"])
-        nue[i] = np.sum(nuer * nuep)
-        nueb[i] = np.sum(nuebr * nuebp)
+      nue_rate = beam(Es) * NumuCCTotInterp(Es)
+      antinue_rate = beam(Es) * NumubCCTotInterp(Es)
+      L = self.params["expt_baseline"]
+
+      if do_integral:
+        obs = np.zeros((2,novpts + 1))
+        corner_obs = np.zeros((2,4))
+          
+        for i in range(novpts + 1):
+          self.params["delta"] = -np.pi + 2*np.pi*(i/float(novpts))
+          nuep, nuebp = Probability_Matter_LBL(Es, L, self.params, 
+                                               osc_channels=["nue_appearance", "antinue_appearance"])
+          num_nue = np.sum(nue_rate * nuep)
+          num_antinue = np.sum(antinue_rate * nuebp)
+
+          if ((i % 10) == 0) and (i//10 < 4):
+            corner_obs[0, i//10] = num_nue
+            corner_obs[1, i//10] = num_antinue
+          
+          obs[0,i] = num_nue
+          obs[1,i] = num_antinue
+      else:
+        obs = np.zeros((2, novpts + 1, Es.shape[0]))
+        corner_obs = np.zeros((2, 4, Es.shape[0]))
+          
+        for i in range(novpts + 1):
+          self.params["delta"] = -np.pi + 2*np.pi*(i/float(novpts))
+          nuep, nuebp = Probability_Matter_LBL(Es, L, self.params, 
+                                               osc_channels=["nue_appearance", "antinue_appearance"])
+
+          num_nue = nue_rate * nuep
+          num_antinue = antinue_rate * nuebp
+
+          if ((i % 10) == 0) and (i//10 < 4):
+            corner_obs[0, i//10, :] = num_nue
+            corner_obs[1, i//10, :] = num_antinue
+          
+          obs[0,i,:] = num_nue
+          obs[1,i,:] = num_antinue
+
       self.params["delta"] = odcp
+      return obs, corner_obs
+        
 
-      return nue, nueb
-
-    beam = self.gen_beam("DUNE")
-
-    nue0, nueb0 = cdcp(beam, np.linspace(0.25,1,50))
-    nue1, nueb1 = cdcp(beam, np.linspace(1,2,50))
-    nue2, nueb2 = cdcp(beam, np.linspace(2,6,50))
+    beam = self.gen_beam("Gaussian")
+    Es = np.linspace(0.01, 8, 100)
+    (obs_nue, obs_antinue), _ = get_oval_points(Es, beam)
     
     self.figs["bievent"] = go.FigureWidget(
        data=[ 
-             go.Scatter(x=nue0, 
-                         y=nueb0,
-                         mode="lines",
-                         name="Before Oscillations"),
-             go.Scatter(x=nue1, 
-                         y=nueb1,
-                         mode="lines",
-                         name="Before Oscillations"),
-             go.Scatter(x=nue2, 
-                         y=nueb2,
-                         mode="lines",
-                         name="Before Oscillations")
+             go.Scatter(x=obs_nue, 
+                        y=obs_antinue,
+                        mode="lines",
+                        # name="Before Oscillations",
+                       ),
+             go.Scatter(x=obs_nue, 
+                        y=obs_antinue,
+                        mode="lines",
+                        # name="Before Oscillations",
+                        visible=False,
+                       ),
+              go.Scatter( x=obs_nue, 
+                        y=obs_antinue,
+                        mode="lines",
+                        # name="Before Oscillations",
+                        visible=False
+                       )
             ],
-       layout=go.Layout(template="simple_white", height=240, width=640,
-                        yaxis_title='Neutrino Events',
-                        xaxis_title='Neutrino Energy [GeV]',
+       layout=go.Layout(template="simple_white", height=640, width=640,
+                        yaxis_title='Electron Antineutrino Events',
+                        xaxis_title='Electron Neutrino Events',
                         margin=dict(b=10,l=10,t=5,r=5))
     )
-    return self.figs["bievent"]
+
+    beam_selector = wdgt.ToggleButtons(
+      options=['Gaussian', 'DUNE', 'NOvA', 'T2K'],
+      description='Choose Beam:')
+
+    dointeg_btn = wdgt.ToggleButtons(
+      options=['Total', 'Single Energies'],
+      description='Choose Event Rate Type:')
+
+    energy_sliders = [ wdgt.FloatSlider(orientation='horizontal',
+                                         value=x,
+                                         min=0.1,
+                                         max=7.9,
+                                         step=0.1) for x in range(3) ]
+    
+    def update(v):
+      beam = self.gen_beam(beam_selector.value)
+
+      if beam_selector.value == "DUNE":
+        self.params["expt_baseline"] = 1300
+        self.sliders["expt_baseline"].value = 1300
+      elif beam_selector.value == "NOvA":
+        self.params["expt_baseline"] = 810
+        self.sliders["expt_baseline"].value = 810
+      elif beam_selector.value == "T2K":
+        self.params["expt_baseline"] = 295
+        self.sliders["expt_baseline"].value = 295
+      
+      dointeg = dointeg_btn.value == "Total"
+      (obs_nue, obs_antinue), _ = get_oval_points(Es if dointeg else np.array([energy_sliders[i].value for i in range(3)]), 
+                                                  beam, dointeg)
+
+      with self.figs["bievent"].batch_update():
+        if dointeg:
+          self.figs["bievent"].data[0].x = obs_nue
+          self.figs["bievent"].data[0].y = obs_antinue
+          
+          self.figs["bievent"].update_traces(selector=1, patch=dict(visible=False))
+          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=False))
+        else:
+          self.figs["bievent"].data[0].x = obs_nue[:,0]
+          self.figs["bievent"].data[0].y = obs_antinue[:,0]
+          
+          self.figs["bievent"].update_traces(selector=1, patch=dict(visible=True))
+          self.figs["bievent"].data[1].x = obs_nue[:,1]
+          self.figs["bievent"].data[1].y = obs_antinue[:,1]
+          
+          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=True))
+          self.figs["bievent"].data[2].x = obs_nue[:,2]
+          self.figs["bievent"].data[2].y = obs_antinue[:,2]
+    
+    osc_controls = ["s13sq", "s23sq", "Dmsq32", "Dmsq21", "delta"]
+    self.register_callback("bievent", osc_controls, update)
+    det_controls = ["expt_baseline", "expt_mass"]
+    self.register_callback("bievent", det_controls, update)
+    beam_controls = ["gaussbeam_mu", "gaussbeam_w"]
+    self.register_callback("bievent", beam_controls, update)
+
+    beam_selector.observe(update)
+    dointeg_btn.observe(update)
+    [energy_sliders[i].observe(update) for i in range(3)]
+    
+    return wdgt.HBox([ self.figs["bievent"], 
+                       wdgt.VBox([wdgt.Label("Oscillation Parameters:"), self.get_control_box(osc_controls),
+                                  wdgt.Label("Beam Controls:"), beam_selector,
+                                  dointeg_btn,
+                                  wdgt.VBox([ wdgt.HBox([wdgt.Label(f"Energy {i}"), energy_sliders[i]]) for i in range(3) ]) 
+                                 ]) 
+                     ])
 
   def nue_appearance_prob(self, L_km):
     Es = np.linspace(0.05*L_km * self.params["Dmsq31"]/2*np.pi, 1.5*L_km * self.params["Dmsq31"]/2*np.pi,1000)
