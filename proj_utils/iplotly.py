@@ -563,50 +563,13 @@ class iPlotlyOsc:
                                          value=x,
                                          min=0.1,
                                          max=7.9,
-                                         step=0.1) for x in range(3) ]
+                                         step=0.025) for x in range(3) ]
     
     def update(v):    
       dointeg = dointeg_btn.value == "Total"
       (obs_nue, obs_antinue), (curr_nue, curr_antinue) = get_oval_points(Es if dointeg else np.array([energy_sliders[i].value for i in range(3)]), 
                                                   beam, dointeg)
 
-      with self.figs["bievent"].batch_update():
-
-        self.figs["bievent"].update_xaxes(range=[0, np.max(obs_nue)*1.2])
-        self.figs["bievent"].update_yaxes(range=[0, np.max(obs_antinue)*1.2])
-        
-        if dointeg:
-          self.figs["bievent"].update_traces(selector=0, patch=dict(name="Total NuE(Bar) App. Rate"))
-          self.figs["bievent"].data[0].x = obs_nue
-          self.figs["bievent"].data[0].y = obs_antinue
-          self.figs["bievent"].data[1].x = [curr_nue,]
-          self.figs["bievent"].data[1].y = [curr_antinue,]
-          
-          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=False))
-          self.figs["bievent"].update_traces(selector=3, patch=dict(visible=False))
-          self.figs["bievent"].update_traces(selector=4, patch=dict(visible=False))
-          self.figs["bievent"].update_traces(selector=5, patch=dict(visible=False))
-        else:
-          self.figs["bievent"].update_traces(selector=0, patch=dict(name="Rate Density"))
-          self.figs["bievent"].data[0].x = obs_nue[:,0]
-          self.figs["bievent"].data[0].y = obs_antinue[:,0]
-          self.figs["bievent"].data[1].x = [curr_nue[0],]
-          self.figs["bievent"].data[1].y = [curr_antinue[0],]
-          
-          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=True))
-          self.figs["bievent"].update_traces(selector=3, patch=dict(visible=True))
-          self.figs["bievent"].data[2].x = obs_nue[:,1]
-          self.figs["bievent"].data[2].y = obs_antinue[:,1]
-          self.figs["bievent"].data[3].x = [curr_nue[1],]
-          self.figs["bievent"].data[3].y = [curr_antinue[1],]
-          
-          self.figs["bievent"].update_traces(selector=4, patch=dict(visible=True))
-          self.figs["bievent"].update_traces(selector=5, patch=dict(visible=True))
-          self.figs["bievent"].data[4].x = obs_nue[:,2]
-          self.figs["bievent"].data[4].y = obs_antinue[:,2]
-          self.figs["bievent"].data[5].x = [curr_nue[2],]
-          self.figs["bievent"].data[5].y = [curr_antinue[2],]
-          
       with self.figs["bievrate"].batch_update():
         numu_rate = beam(rEs) * NumuCCTotInterp(rEs) * arb_sf
         numub_rate = beam(rEs) * NumubCCTotInterp(rEs) * arb_sf
@@ -630,6 +593,52 @@ class iPlotlyOsc:
           self.figs["bievrate"].update_traces(selector=4, patch=dict(visible=True))
           self.figs["bievrate"].data[4].x = [energy_sliders[2].value,energy_sliders[2].value]
           self.figs["bievrate"].data[4].y = [0, ymax]
+      
+      with self.figs["bievent"].batch_update():
+        if dointeg:
+          self.figs["bievent"].update_traces(selector=0, patch=dict(name="Total NuE(Bar) App. Rate"))
+          self.figs["bievent"].data[0].x = obs_nue
+          self.figs["bievent"].data[0].y = obs_antinue
+          self.figs["bievent"].data[1].x = [curr_nue,]
+          self.figs["bievent"].data[1].y = [curr_antinue,]
+          
+          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=False))
+          self.figs["bievent"].update_traces(selector=3, patch=dict(visible=False))
+          self.figs["bievent"].update_traces(selector=4, patch=dict(visible=False))
+          self.figs["bievent"].update_traces(selector=5, patch=dict(visible=False))
+
+          self.figs["bievent"].update_xaxes(range=[0, np.max(obs_nue)*1.2])
+          self.figs["bievent"].update_yaxes(range=[0, np.max(obs_antinue)*1.2])
+        else:
+          self.figs["bievent"].update_traces(selector=0, patch=dict(name="Rate Density"))
+          self.figs["bievent"].data[0].x = obs_nue[:,0]
+          self.figs["bievent"].data[0].y = obs_antinue[:,0]
+          self.figs["bievent"].data[1].x = [curr_nue[0],]
+          self.figs["bievent"].data[1].y = [curr_antinue[0],]
+          
+          self.figs["bievent"].update_traces(selector=2, patch=dict(visible=True))
+          self.figs["bievent"].update_traces(selector=3, patch=dict(visible=True))
+          self.figs["bievent"].data[2].x = obs_nue[:,1]
+          self.figs["bievent"].data[2].y = obs_antinue[:,1]
+          self.figs["bievent"].data[3].x = [curr_nue[1],]
+          self.figs["bievent"].data[3].y = [curr_antinue[1],]
+          
+          self.figs["bievent"].update_traces(selector=4, patch=dict(visible=True))
+          self.figs["bievent"].update_traces(selector=5, patch=dict(visible=True))
+          self.figs["bievent"].data[4].x = obs_nue[:,2]
+          self.figs["bievent"].data[4].y = obs_antinue[:,2]
+          self.figs["bievent"].data[5].x = [curr_nue[2],]
+          self.figs["bievent"].data[5].y = [curr_antinue[2],]
+
+          
+          numu_rate = beam(Es) * NumuCCTotInterp(Es) * arb_sf
+          numub_rate = beam(Es) * NumubCCTotInterp(Es) * arb_sf
+          ocd = self.params["delta"]
+          self.params["delta"] = 0.7
+          nuep, nuebp = Probability_Matter_LBL(Es, self.params["expt_baseline"], self.params, osc_channels=["nue_appearance", "antinue_appearance"])
+          self.figs["bievent"].update_xaxes(range=[0, np.max(nuep*numu_rate)*1.75])
+          self.figs["bievent"].update_yaxes(range=[0, np.max(numub_rate*nuebp)*1.3])
+          self.params["delta"] = ocd
 
     osc_controls = ["s13sq", "s23sq", "Dmsq32", "Dmsq21", "delta"]
     self.register_callback("bievent", osc_controls, update)
