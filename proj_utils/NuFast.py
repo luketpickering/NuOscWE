@@ -184,6 +184,112 @@ def _Probability_Matter_LBL(E, L, osc_params, osc_channel_ids=[]):
               probs_returned.append(1 - (1 - Pee - (Pme_CPC - Pme_CPV)) - (1 - (Pme_CPC + Pme_CPV) - Pmm))
   return probs_returned
 
+def _Probability_Vacuum_LBL(E, L, osc_params, osc_channel_ids=[]):
+  if len(osc_channel_ids) == 0:
+    return np.array([])
+  
+  s12sq = osc_params["s12sq"]
+  s13sq = osc_params["s13sq"]
+  s23sq = osc_params["s23sq"]
+  delta = osc_params["delta"]
+  Dmsq21 = osc_params["Dmsq21"]
+  Dmsq31 = osc_params["Dmsq31"]
+  
+  # --------------------------------------------------------------------- #
+  # First calculate useful simple functions of the oscillation parameters #
+  # --------------------------------------------------------------------- #
+  c13sq = 1 - s13sq
+
+  # Ueisq's
+  Ue3sq = s13sq
+  Ue2sq = c13sq * s12sq
+
+  # Umisq's, Utisq's and Jvac	 
+  Um3sq = c13sq * s23sq
+  # Um2sq and Ut2sq are used here as temporary variables, will be properly defined later	 
+  Ut2sq = s13sq * s12sq * s23sq
+  Um2sq = (1 - s12sq) * (1 - s23sq)
+    
+  Jrr = np.sqrt(Um2sq * Ut2sq)
+  sind = np.sin(delta)
+  cosd = np.cos(delta)
+  Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd
+  Jvac = 8 * Jrr * c13sq * sind
+  
+  # ----------------------- #
+  # Get all elements of Usq #
+  # ----------------------- #
+  Ue1sq = 1 - Ue3sq - Ue2sq
+  Um1sq = 1 - Um3sq - Um2sq
+
+  Ut3sq = 1 - Um3sq - Ue3sq
+  Ut2sq = 1 - Um2sq - Ue2sq
+  Ut1sq = 1 - Um1sq - Ue1sq
+
+  # ----------------------- #
+  # Get the kinematic terms #
+  # ----------------------- #
+  Lover4E = eVsqkm_to_GeV_over4 * L / E
+
+  D21 = Dmsq21 * Lover4E
+  D31 = Dmsq31 * Lover4E
+    
+  sinD21 = np.sin(D21)
+  sinD31 = np.sin(D31)
+  sinD32 = np.sin(D31-D21)
+
+  triple_sin = sinD21 * sinD31 * sinD32
+
+  sinsqD21_2 = 2 * sinD21 * sinD21
+  sinsqD31_2 = 2 * sinD31 * sinD31
+  sinsqD32_2 = 2 * sinD32 * sinD32
+
+  # ------------------------------------------------------------------- #
+  # Calculate the three necessary probabilities, separating CPC and CPV #
+  # ------------------------------------------------------------------- #
+  Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2 \
+          + (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2 \
+          + (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2
+  
+  Pme_CPV = -Jvac * triple_sin
+
+  Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2 \
+               + Um3sq * Um1sq * sinsqD31_2 \
+               + Um3sq * Um2sq * sinsqD32_2)
+
+  Pee = 1 - 2 * (Ue2sq * Ue1sq * sinsqD21_2 \
+               + Ue3sq * Ue1sq * sinsqD31_2 \
+               + Ue3sq * Ue2sq * sinsqD32_2)
+
+  # ---------------------------- #
+  # Assign all the probabilities #
+  # ---------------------------- #
+  probs_returned = []
+
+  for ch in osc_channel_ids:
+      if ch[0] == 0:
+          if ch[1] == 0:
+              probs_returned.append(Pee)
+          elif ch[1] == 1:
+              probs_returned.append(Pme_CPC - Pme_CPV)
+          elif ch[1] == 2:
+              probs_returned.append(1 - Pee - (Pme_CPC - Pme_CPV))
+      if ch[0] == 1:
+          if ch[1] == 0:
+              probs_returned.append(Pme_CPC + Pme_CPV)
+          elif ch[1] == 1:
+              probs_returned.append(Pmm)
+          elif ch[1] == 2:
+              probs_returned.append(1 - (Pme_CPC + Pme_CPV) - Pmm)
+      if ch[0] == 2:
+          if ch[1] == 0:
+              probs_returned.append(1 - Pee - (Pme_CPC + Pme_CPV))
+          elif ch[1] == 1:
+              probs_returned.append(1 - (Pme_CPC - Pme_CPV) - Pmm)
+          elif ch[1] == 2:
+              probs_returned.append(1 - (1 - Pee - (Pme_CPC - Pme_CPV)) - (1 - (Pme_CPC + Pme_CPV) - Pmm))
+  return probs_returned
+
 def Probability_Matter_LBL(E, L, osc_params, osc_channels=[]):
 
   if not hasattr(E, "__len__"): # doesn't have a length, assume scalar and wrap in an array
@@ -213,8 +319,12 @@ def Probability_Matter_LBL(E, L, osc_params, osc_channels=[]):
       antinu_osc_channel_ids.append((1,2))
       return_order.append(-len(antinu_osc_channel_ids))
 
-  nu_probs = _Probability_Matter_LBL(E, L, osc_params, nu_osc_channel_ids)
-  antinu_probs = _Probability_Matter_LBL(-E, L, osc_params, antinu_osc_channel_ids)
+  if "use_vacuum_prob" in osc_params and osc_params["use_vacuum_prob"]:
+    nu_probs = _Probability_Vacuum_LBL(E, L, osc_params, nu_osc_channel_ids)
+    antinu_probs = _Probability_Vacuum_LBL(-E, L, osc_params, antinu_osc_channel_ids)
+  else:
+    nu_probs = _Probability_Matter_LBL(E, L, osc_params, nu_osc_channel_ids)
+    antinu_probs = _Probability_Matter_LBL(-E, L, osc_params, antinu_osc_channel_ids)
 
   return_probs = np.empty((len(return_order), E.shape[0]))
 
