@@ -35,7 +35,8 @@ IntrLHood.events_nu_numu_cc = IntrLHood.simulated_events_nu_mode[IntrLHood.simul
 
 def _get_hist(osc_params, exposure_sf, bins):
   return hist1d(data=IntrLHood.events_nu_numu_cc["E_neutrino"], 
-                  weights=exposure_sf * Probability_Matter_LBL(IntrLHood.events_nu_numu_cc["E_neutrino"], 
+                  weights=exposure_sf * Probability_Matter_LBL(IntrLHood.events_nu_numu_cc["E_neutrino"],
+                                                               osc_params["experimental_baseline_km"],
                                                                osc_params, osc_channels=["numu_survival"]), 
                   bins=bins)[0]
 

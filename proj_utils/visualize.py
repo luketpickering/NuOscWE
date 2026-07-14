@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .stats import gaus
+from .stats import gaus, hist1d
 
 def get_scaled_gaus(num_samples, loc, scale, bins):
   bin_width = (bins[-1] - bins[0])/(bins.shape[0]-1)
@@ -24,3 +24,19 @@ def drawhist1d(*, hist=None, data=None, bins=None, weights=None, **kwargs):
         raise RuntimeError("Must pass either hist= or data= arguments")
 
     return plt.gca().stairs(counts, bins, **kwargs)
+
+def hist1dtoline(bin_vals, bins):
+  vals = np.zeros((2, (bin_vals.shape[0] + 1) * 2))
+  vals[0,0] = bins[0]
+  vals[1,0] = 0
+  for i in range(bin_vals.shape[0]):
+    vals[0,1 + 2*i] = bins[i]
+    vals[1,1 + 2*i] = bin_vals[i]
+    
+    vals[0,2 + 2*i] = bins[i+1]
+    vals[1,2 + 2*i] = bin_vals[i]
+
+  vals[0,-1] = bins[-1]
+  vals[1,-1] = 0
+
+  return vals
