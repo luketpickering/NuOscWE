@@ -11,14 +11,14 @@ def ReconstructedNeutrinoEnergy(df, params={}):
   
   erec = 0
   if muon_Eres > 0:
-      erec += np.where(df["pid_lepton"] == 13, np.random.normal(df["E_lepton"], muon_Eres*df["E_lepton"]), 0)
+      erec += np.where(np.absolute(df["pid_lepton"]) == 13, np.random.normal(df["E_lepton"], muon_Eres*df["E_lepton"]), 0)
   else:
-      erec += np.where(df["pid_lepton"] == 13, df["E_lepton"], 0)
+      erec += np.where(np.absolute(df["pid_lepton"]) == 13, df["E_lepton"], 0)
 
   if electron_Eres > 0:
-      erec += np.where(df["pid_lepton"] == 11, np.random.normal(df["E_lepton"], electron_Eres*df["E_lepton"]),0)
+      erec += np.where(np.absolute(df["pid_lepton"]) == 11, np.random.normal(df["E_lepton"], electron_Eres*df["E_lepton"]),0)
   else:
-      erec += np.where(df["pid_lepton"] == 11, df["E_lepton"], 0)
+      erec += np.where(np.absolute(df["pid_lepton"]) == 11, df["E_lepton"], 0)
   
   if proton_Tres > 0:
       erec += np.random.normal(df["T_proton"], proton_Tres*df["T_proton"])
