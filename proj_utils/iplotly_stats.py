@@ -28,6 +28,7 @@ class iPlotlyStats:
     }
 
     self.evnu = pa.read_csv("simulation/neutrino_mode_events.csv")
+    self.numu_cc_nu = self.evnu[self.evnu["pid_lepton"] == 13]
     self.evnub = pa.read_csv("simulation/antineutrino_mode_events.csv")
     
   def gaus_fit(self):
@@ -72,7 +73,7 @@ class iPlotlyStats:
                             x=0.99
                         ))
     )
-    self.figs["gaus_fit"].update_yaxes(range=[0, np.max(h_obs)*1.2])
+    self.figs["gaus_fit"].update_yaxes(range=[0, np.max(h_obs[1])*1.2])
     self.figs["gaus_fit"].update_xaxes(range=[-3,3])
 
     mu_slider = wdgt.FloatSlider(orientation='horizontal',
@@ -137,11 +138,15 @@ class iPlotlyStats:
                       ])
                      ])
 
-  def get_osc_hist(self, evdf, osc_params, bins, osc_channels):
+  def get_osc_hist(self, evdf, osc_params, bins, osc_channels, exposure_factor=1, poissf=False):
     bv, be = hist1d(data=evdf["E_neutrino"], 
-                                weights=Probability_Matter_LBL(evdf["E_neutrino"], 1300, 
-                                                               osc_params, osc_channels=osc_channels), 
+                                weights=exposure_factor * Probability_Matter_LBL(evdf["E_neutrino"], 
+                                                                                 1300, 
+                                                                                 osc_params, 
+                                                                                 osc_channels=osc_channels), 
                                 bins=bins)
+    if poissf:
+      bv = poisson_fluctuate(bv)
     return hist1dtoline(bv, be), ((be[1:] + be[:-1])/2.0, bv)
 
   def hist_comp1(self): 
@@ -335,17 +340,19 @@ class iPlotlyStats:
       "s23sq": 0.55,
       "delta": 0.7 * np.pi,
       "Dmsq21": 7.5e-5,
-      "Dmsq31": 2.64e-3
+      "Dmsq31": 2.623e-3
     }
+
+    exposure_factor = 0.1
   
     events_nu_numu_cc = self.evnu[self.evnu["pid_lepton"] == 13]
 
-    bins = np.linspace(start=0, stop=8, num=50)
+    bins = np.linspace(start=0, stop=8, num=25)
     
-    hobs, _ = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"])
+    hobs, obs = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
 
-    osc_params["Dmsq31"] = 2.5e-3
-    hpred, herr = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"])
+    osc_params["Dmsq31"] = 2.6e-3
+    hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
     
     self.figs["lhood_scan_1"] = go.FigureWidget(
        data=[ 
@@ -353,14 +360,14 @@ class iPlotlyStats:
                           y=hpred[1], 
                           line_color=self.nucols[1],
                           name="Prediction"),
-               go.Scatter(x=herr[0],
-                          y=herr[1],
+               go.Scatter(x=pred[0],
+                          y=pred[1],
                           line_color=self.nucols[1],
                           marker_color=self.nucols[1],
                           mode="markers",
                           error_y=dict(
                             type='data', # value of error bar given in data coordinates
-                            array=np.sqrt(herr[1]),
+                            array=np.sqrt(pred[1]),
                             visible=True),
                           showlegend=False),
          
@@ -381,26 +388,455 @@ class iPlotlyStats:
                             x=0.99
                         ))
     )
+    self.figs["lhood_scan_1"].update_yaxes(range=[0, np.max(obs[1])*1.2])
 
+    dm31_minmax = (2.5, 2.7)
+    
     dm31_slider = wdgt.FloatSlider(orientation='horizontal',
                                   value=osc_params["Dmsq31"]*1E3,
-                                  min=2,
-                                  max=3,
-                                  step=0.025)
+                                  min=dm31_minmax[0],
+                                  max=dm31_minmax[1],
+                                  step=(dm31_minmax[1] - dm31_minmax[0])/100)
 
+    lhood_x = np.linspace(dm31_minmax[0], dm31_minmax[1], 100)
+    lhood_y = np.zeros_like(lhood_x)
+
+    osc_params["Dmsq31"] = dm31_minmax[0]*1E-3
+    _, pred_min = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    osc_params["Dmsq31"] = dm31_minmax[1]*1E-3
+    _, pred_max = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+
+    lhood_ymax = max(Pearson_N2LLH(obs[1], pred_min[1]), Pearson_N2LLH(obs[1], pred_max[1]))
+
+    self.figs["lhood_scan_1_scan"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=lhood_x,
+                          y=lhood_y,
+                          mode="markers",
+                          marker_color=self.nucols[2],
+                          showlegend=False),
+               go.Scatter(x=[2.6, 2.6],
+                          y=[0,lhood_ymax],
+                          line_color=self.nucols[3],
+                          showlegend=False),
+            ],
+       layout=go.Layout(template="simple_white", height=360, width=360,
+                        yaxis_title='T = -2LLH',
+                        xaxis_title='Dmsq31',
+                        margin=dict(b=10,l=10,t=5,r=5))
+    )
+    self.figs["lhood_scan_1_scan"].update_yaxes(range=[0, lhood_ymax * 1.1])
+
+    updating = False
     def update(v):
+      nonlocal updating
+      if updating:
+        return
+      updating = True
       osc_params["Dmsq31"] = dm31_slider.value*1E-3
-      hpred, herr = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"])
+      hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
     
       with self.figs["lhood_scan_1"].batch_update():
         self.figs["lhood_scan_1"].data[0].y = hpred[1]
-        self.figs["lhood_scan_1"].data[1].y = herr[1]
-        self.figs["lhood_scan_1"].update_traces(selector=1, patch=dict(error_y_array=np.sqrt(herr[1])))
+        self.figs["lhood_scan_1"].data[1].y = pred[1]
+        self.figs["lhood_scan_1"].update_traces(selector=1, patch=dict(error_y_array=np.sqrt(pred[1])))
+
+      nonlocal lhood_y
+      lhood_i = np.argmax(lhood_x > dm31_slider.value)
+      if dm31_slider.value <= lhood_x[0]:
+        lhood_i = 0
+      if dm31_slider.value < lhood_x[-1]:
+        lhood_y[lhood_i] = Pearson_N2LLH(obs[1], pred[1])
+
+      with self.figs["lhood_scan_1_scan"].batch_update():
+        self.figs["lhood_scan_1_scan"].data[0].y = lhood_y
+        self.figs["lhood_scan_1_scan"].data[1].x = [dm31_slider.value, dm31_slider.value]
+
+      updating = False
 
     dm31_slider.observe(update)
     
     return wdgt.HBox([self.figs["lhood_scan_1"],
-                      wdgt.VBox([ 
-                        wdgt.HBox([wdgt.Label(r"$\Delta{}m^{2}_{31} [10^{-3} eV^{2}]$", layout=wdgt.Layout(width="10em")), dm31_slider ]),
+                      wdgt.VBox([
+                        self.figs["lhood_scan_1_scan"],
+                        wdgt.HBox([wdgt.Label(r"$\Delta{}m^{2}_{31} [10^{-3} eV^{2}]$", 
+                                              layout=wdgt.Layout(width="10em")), dm31_slider ])
                       ])
                      ])
+
+  def lhood_scan_2(self):
+
+    osc_params = {
+      "s12sq": 0.31,
+      "s13sq": 0.02,
+      "s23sq": 0.55,
+      "delta": 0.7 * np.pi,
+      "Dmsq21": 7.5e-5,
+      "Dmsq31": 2.585e-3
+    }
+
+    true_val = 2.585e-3
+
+    exposure_factor = 0.05
+  
+    events_nu_numu_cc = self.evnu[self.evnu["pid_lepton"] == 13]
+
+    bins = np.linspace(start=0, stop=8, num=25)
+    
+    hobs, obs = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor, True)
+
+    osc_params["Dmsq31"] = 2.6e-3
+    hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    
+    self.figs["lhood_scan_1"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=hpred[0],
+                          y=hpred[1], 
+                          line_color=self.nucols[1],
+                          name="Prediction"),
+               go.Scatter(x=pred[0],
+                          y=pred[1],
+                          line_color=self.nucols[1],
+                          marker_color=self.nucols[1],
+                          mode="markers",
+                          error_y=dict(
+                            type='data', # value of error bar given in data coordinates
+                            array=np.sqrt(pred[1]),
+                            visible=True),
+                          showlegend=False),
+         
+               go.Scatter(x=hobs[0], 
+                          y=hobs[1],
+                          line_color=self.nucols[0],
+                          name="Observation"),
+            ],
+       layout=go.Layout(template="simple_white", height=480, width=480,
+                        yaxis_title='Count',
+                        xaxis_title='x',
+                        margin=dict(b=10,l=10,t=5,r=5),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="top",
+                            y=0.99,
+                            xanchor="right",
+                            x=0.99
+                        ))
+    )
+    self.figs["lhood_scan_1"].update_yaxes(range=[0, np.max(obs[1])*1.2])
+
+    dm31_minmax = (2.5, 2.7)
+
+    dm31_slider = wdgt.FloatSlider(orientation='horizontal',
+                                  value=osc_params["Dmsq31"]*1E3,
+                                  min=dm31_minmax[0],
+                                  max=dm31_minmax[1],
+                                  step=(dm31_minmax[1] - dm31_minmax[0])/100)
+
+    lhood_x = np.linspace(dm31_minmax[0], dm31_minmax[1], 100)
+    lhood_y = np.zeros_like(lhood_x)
+
+    osc_params["Dmsq31"] = dm31_minmax[0]*1E-3
+    _, pred_min = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    osc_params["Dmsq31"] = dm31_minmax[1]*1E-3
+    _, pred_max = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+
+    lhood_ymax = max(Pearson_N2LLH(obs[1], pred_min[1]), Pearson_N2LLH(obs[1], pred_max[1]))
+
+    self.figs["lhood_scan_1_scan"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=lhood_x,
+                          y=lhood_y,
+                          mode="markers",
+                          marker_color=self.nucols[2],
+                          showlegend=False),
+               go.Scatter(x=[2.6, 2.6],
+                          y=[0,lhood_ymax],
+                          line_color=self.nucols[3],
+                          showlegend=False),
+            ],
+       layout=go.Layout(template="simple_white", height=360, width=360,
+                        yaxis_title='T = -2LLH',
+                        xaxis_title='Dmsq31',
+                        margin=dict(b=10,l=10,t=5,r=5))
+    )
+    self.figs["lhood_scan_1_scan"].update_yaxes(range=[0, lhood_ymax * 1.1])
+
+    updating = False
+    def update(v):
+      nonlocal updating
+      if updating:
+        return
+      updating = True
+      osc_params["Dmsq31"] = dm31_slider.value*1E-3
+      hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    
+      with self.figs["lhood_scan_1"].batch_update():
+        self.figs["lhood_scan_1"].data[0].y = hpred[1]
+        self.figs["lhood_scan_1"].data[1].y = pred[1]
+        self.figs["lhood_scan_1"].update_traces(selector=1, patch=dict(error_y_array=np.sqrt(pred[1])))
+
+      nonlocal lhood_y
+      lhood_i = np.argmax(lhood_x > dm31_slider.value)
+      if dm31_slider.value <= lhood_x[0]:
+        lhood_i = 0
+      if dm31_slider.value < lhood_x[-1]:
+        lhood_y[lhood_i] = Pearson_N2LLH(obs[1], pred[1])
+
+      with self.figs["lhood_scan_1_scan"].batch_update():
+        self.figs["lhood_scan_1_scan"].data[0].y = lhood_y
+        self.figs["lhood_scan_1_scan"].data[1].x = [dm31_slider.value, dm31_slider.value]
+
+      updating = False
+
+    dm31_slider.observe(update)
+
+    sample_btn = wdgt.Button(
+        description='Draw New Sample',
+        disabled=False,
+        button_style='info', # 'success', 'info', 'warning', 'danger' or ''
+        icon='dice-d20' # (FontAwesome names without the `fa-` prefix)
+    )
+    
+    def resample(v):
+      nonlocal obs
+      osc_params["Dmsq31"] = true_val
+      with self.figs["lhood_scan_1"].batch_update():
+        hobs, obs = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor, True)
+        self.figs["lhood_scan_1"].data[2].y = hobs[1]
+        self.figs["lhood_scan_1"].update_yaxes(range=[0, np.max(obs[1])*1.2])
+
+      nonlocal lhood_y
+      lhood_y = np.zeros_like(lhood_x)
+
+      osc_params["Dmsq31"] = dm31_minmax[0]*1E-3
+      _, pred_min = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+      osc_params["Dmsq31"] = dm31_minmax[1]*1E-3
+      _, pred_max = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+
+      lhood_ymax = max(Pearson_N2LLH(obs[1], pred_min[1]), Pearson_N2LLH(obs[1], pred_max[1]))
+      
+      with self.figs["lhood_scan_1_scan"].batch_update():
+        self.figs["lhood_scan_1_scan"].update_yaxes(range=[0, lhood_ymax * 1.1])
+        self.figs["lhood_scan_1_scan"].data[1].y = [0, lhood_ymax]
+
+      update(v)
+
+    sample_btn.on_click(resample)
+    
+    return wdgt.HBox([self.figs["lhood_scan_1"],
+                      wdgt.VBox([
+                        self.figs["lhood_scan_1_scan"],
+                        wdgt.HBox([wdgt.Label(r"$\Delta{}m^{2}_{31} [10^{-3} eV^{2}]$", 
+                                              layout=wdgt.Layout(width="10em")), dm31_slider ]),
+                        sample_btn
+                      ])
+                     ])
+
+  def lhood_scan_3(self):
+
+    osc_params = {
+      "s12sq": 0.31,
+      "s13sq": 0.02,
+      "s23sq": 0.555,
+      "delta": 0.7 * np.pi,
+      "Dmsq21": 7.5e-5,
+      "Dmsq31": 2.623e-3
+    }
+
+    true_vals = [2.623e-3, 0.58]
+
+    exposure_factor = 0.1
+  
+    events_nu_numu_cc = self.evnu[self.evnu["pid_lepton"] == 13]
+
+    bins = np.linspace(start=0, stop=8, num=25)
+    
+    hobs, obs = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+
+    osc_params["Dmsq31"] = 2.55e-3
+    osc_params["s23sq"] = 0.55
+    hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    
+    self.figs["lhood_scan_3"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=hpred[0],
+                          y=hpred[1], 
+                          line_color=self.nucols[1],
+                          name="Prediction"),
+               go.Scatter(x=pred[0],
+                          y=pred[1],
+                          line_color=self.nucols[1],
+                          marker_color=self.nucols[1],
+                          mode="markers",
+                          error_y=dict(
+                            type='data', # value of error bar given in data coordinates
+                            array=np.sqrt(pred[1]),
+                            visible=True),
+                          showlegend=False),
+         
+               go.Scatter(x=hobs[0], 
+                          y=hobs[1],
+                          line_color=self.nucols[0],
+                          name="Observation"),
+            ],
+       layout=go.Layout(template="simple_white", height=480, width=480,
+                        yaxis_title='Count',
+                        xaxis_title='x',
+                        margin=dict(b=10,l=10,t=5,r=5),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="top",
+                            y=0.99,
+                            xanchor="right",
+                            x=0.99
+                        ))
+    )
+    self.figs["lhood_scan_3"].update_yaxes(range=[0, np.max(obs[1])*1.2])
+
+    dm31_minmax = (2.5, 2.7)
+    
+    dm31_slider = wdgt.FloatSlider(orientation='horizontal',
+                                  value=osc_params["Dmsq31"]*1E3,
+                                  min=dm31_minmax[0],
+                                  max=dm31_minmax[1],
+                                  step=(dm31_minmax[1] - dm31_minmax[0])/100)
+
+    ssqth23_minmax = (0.5, 0.65)
+    
+    ssqth23_slider = wdgt.FloatSlider(orientation='horizontal',
+                                  value=osc_params["s23sq"],
+                                  min=ssqth23_minmax[0],
+                                  max=ssqth23_minmax[1],
+                                  step=(ssqth23_minmax[1] - ssqth23_minmax[0])/100)
+
+    
+    dm31_lhood_x = np.linspace(dm31_minmax[0], dm31_minmax[1], 100)
+    dm31_lhood_y = np.zeros_like(dm31_lhood_x)
+
+    self.figs["lhood_scan_3_scan1"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=dm31_lhood_x,
+                          y=dm31_lhood_y,
+                          mode="markers",
+                          marker_color=self.nucols[2],
+                          showlegend=False),
+               go.Scatter(x=[2.6, 2.6],
+                          y=[0, 140],
+                          line_color=self.nucols[3],
+                          showlegend=False),
+            ],
+       layout=go.Layout(template="simple_white", height=200, width=360,
+                        yaxis_title='T = -2LLH',
+                        xaxis_title='Dmsq31',
+                        margin=dict(b=10,l=10,t=5,r=5))
+    )
+    self.figs["lhood_scan_3_scan1"].update_yaxes(range=[0, 150])
+
+        
+    ssqth23_lhood_x = np.linspace(ssqth23_minmax[0], ssqth23_minmax[1], 100)
+    ssqth23_lhood_y = np.zeros_like(ssqth23_lhood_x)
+
+    self.figs["lhood_scan_3_scan2"] = go.FigureWidget(
+       data=[ 
+               go.Scatter(x=ssqth23_lhood_x,
+                          y=ssqth23_lhood_y,
+                          mode="markers",
+                          marker_color=self.nucols[2],
+                          showlegend=False),
+               go.Scatter(x=[0.54, 0.54],
+                          y=[0, 140],
+                          line_color=self.nucols[3],
+                          showlegend=False),
+            ],
+       layout=go.Layout(template="simple_white", height=200, width=360,
+                        yaxis_title='T = -2LLH',
+                        xaxis_title='ssqth23',
+                        margin=dict(b=10,l=10,t=5,r=5))
+    )
+    self.figs["lhood_scan_3_scan2"].update_yaxes(range=[0, 150])
+
+    
+    updating = False
+    def update(v):
+      nonlocal updating
+      if updating:
+        return
+      updating = True
+      osc_params["Dmsq31"] = dm31_slider.value*1E-3
+      osc_params["s23sq"] = ssqth23_slider.value
+      hpred, pred = self.get_osc_hist(events_nu_numu_cc, osc_params, bins, ["numu_survival"], exposure_factor)
+    
+      with self.figs["lhood_scan_3"].batch_update():
+        self.figs["lhood_scan_3"].data[0].y = hpred[1]
+        self.figs["lhood_scan_3"].data[1].y = pred[1]
+        self.figs["lhood_scan_3"].update_traces(selector=1, patch=dict(error_y_array=np.sqrt(pred[1])))
+
+      nonlocal dm31_lhood_y, ssqth23_lhood_y
+      lhood_i = np.argmax(dm31_lhood_x > dm31_slider.value)
+      if dm31_slider.value <= dm31_lhood_x[0]:
+        lhood_i = 0
+      if dm31_slider.value < dm31_lhood_x[-1]:
+        dm31_lhood_y[lhood_i] = Pearson_N2LLH(obs[1], pred[1])
+
+      with self.figs["lhood_scan_3_scan1"].batch_update():
+        self.figs["lhood_scan_3_scan1"].data[0].y = dm31_lhood_y
+        self.figs["lhood_scan_3_scan1"].data[1].x = [dm31_slider.value, dm31_slider.value]
+
+      lhood_i = np.argmax(ssqth23_lhood_x > ssqth23_slider.value)
+      if ssqth23_slider.value <= ssqth23_lhood_x[0]:
+        lhood_i = 0
+      if ssqth23_slider.value < ssqth23_lhood_x[-1]:
+        ssqth23_lhood_y[lhood_i] = Pearson_N2LLH(obs[1], pred[1])
+
+      with self.figs["lhood_scan_3_scan2"].batch_update():
+        self.figs["lhood_scan_3_scan2"].data[0].y = ssqth23_lhood_y
+        self.figs["lhood_scan_3_scan2"].data[1].x = [ssqth23_slider.value, ssqth23_slider.value]
+
+
+      updating = False
+
+    dm31_slider.observe(update)
+    ssqth23_slider.observe(update)
+    
+    return wdgt.HBox([self.figs["lhood_scan_3"],
+                      wdgt.VBox([
+                        self.figs["lhood_scan_3_scan1"],
+                        self.figs["lhood_scan_3_scan2"],
+                        wdgt.HBox([wdgt.Label(r"$\Delta{}m^{2}_{31} [10^{-3} eV^{2}]$", 
+                                              layout=wdgt.Layout(width="10em")), dm31_slider ]),
+                        wdgt.HBox([wdgt.Label(r"$\mathrm{sin}^{2}(\theta_{23})$", 
+                                              layout=wdgt.Layout(width="10em")), ssqth23_slider ])
+                      ])
+                     ])
+  
+  def get_observation(self, bins, fluctuate=False):
+    osc_params = {
+      "s12sq": 0.31,
+      "s13sq": 0.02,
+      "s23sq": 0.55,
+      "delta": 0.7 * np.pi,
+      "Dmsq21": 7.5e-5,
+      "Dmsq31": 2.625e-3
+    }
+    return self.get_osc_hist(self.numu_cc_nu, 
+                      osc_params, bins, ["numu_survival"], 
+                      exposure_factor=0.1, poissf=fluctuate)[1][1]
+
+  def get_test_observation(self, bins):
+    osc_params = {
+      "s12sq": 0.31,
+      "s13sq": 0.02,
+      "s23sq": 0.585,
+      "delta": 0.7 * np.pi,
+      "Dmsq21": 7.5e-5,
+      "Dmsq31": 2.56e-3
+    }
+    return self.get_osc_hist(self.numu_cc_nu, 
+                      osc_params, bins, ["numu_survival"], 
+                      exposure_factor=0.1, poissf=True)[1][1]
+  
+  def get_prediction(self, osc_params, bins):
+    return self.get_osc_hist(self.numu_cc_nu, 
+                      osc_params, bins, ["numu_survival"], 
+                      exposure_factor=0.1, poissf=False)[1][1]
+    

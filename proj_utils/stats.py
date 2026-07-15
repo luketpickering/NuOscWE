@@ -42,4 +42,6 @@ def Poisson_N2LLH(data_hist, predicted_hist):
 def Pearson_N2LLH(data_hist, predicted_hist):
   if data_hist.shape != predicted_hist.shape:
     raise RuntimeError(f"Shape mismatch in Pearson_N2LLH: data: {data_hist.shape}, pred: {predicted_hist.shape}")
-  return np.sum(np.power(predicted_hist - data_hist,2)/data_hist)
+  datanz = data_hist[data_hist > 0]
+  prednz = predicted_hist[data_hist > 0]
+  return np.sum(np.power(prednz - datanz, 2)/datanz)
