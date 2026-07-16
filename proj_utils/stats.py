@@ -24,11 +24,12 @@ def hist1d(data, bins, weights=None):
     return (bin_vals, bins)
 
 def write_hist1d(hist, filename):
-  np.save(filename, np.array([bin_vals, bins]))
+  bvs = np.append(hist[0], 0)
+  np.savetxt(filename, np.array([bvs, hist[1]]), delimiter=",")
 
 def read_hist1d(filename):
-  npd = numpy.load(filename)
-  return npd[0], ndp[1]
+  npd = np.loadtxt(filename, delimiter=",")
+  return npd[0,:-1], npd[1]
 
 def poisson_fluctuate(counts):
   rng = np.random.default_rng()
