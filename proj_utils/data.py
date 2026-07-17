@@ -10,9 +10,13 @@ class AnalysisData:
   def __init__(self):
     self.bins = np.linspace(start=0, stop=8, num=40)
     self.fns = [ "data/obs_nu_mode_numucc.csv",
-              "data/obs_nu_mode_nuecc",
-              "data/obs_antinu_mode_numucc",
-              "data/obs_antinu_mode_nuecc" ]
+                 "data/obs_nu_mode_nuecc.csv",
+                 "data/obs_antinu_mode_numucc.csv",
+                 "data/obs_antinu_mode_nuecc.csv" ]
+    self.noffns = [ "data/obs_nu_mode_numucc.csv",
+                    "data/nofobs_nu_mode_nuecc.csv",
+                    "data/nofobs_antinu_mode_numucc.csv",
+                    "data/nofobs_antinu_mode_nuecc.csv" ]
 
   def get_bins(self):
     return self.bins
@@ -25,6 +29,15 @@ class AnalysisData:
     return read_hist1d(self.fns[2])
   def get_obs_antinu_mode_nuecc(self):
     return read_hist1d(self.fns[3])
+
+  def get_nofobs_nu_mode_numucc(self):
+    return read_hist1d(self.noffns[0])
+  def get_nofobs_nu_mode_nuecc(self):
+    return read_hist1d(self.noffns[1])
+  def get_nofobs_antinu_mode_numucc(self):
+    return read_hist1d(self.noffns[2])
+  def get_nofobs_antinu_mode_nuecc(self):
+    return read_hist1d(self.noffns[3])
   
   def gen(self):
     sf = 0.15
@@ -82,6 +95,7 @@ class AnalysisData:
               hist1d(data=reco_E_antinu_nue, weights=event_osc_weights_antinue_app, bins=self.bins) ]
 
     for i,h in enumerate(hists):
+      write_hist1d((h[0]*sf,h[1]), self.noffns[i])
       write_hist1d((poisson_fluctuate(h[0]*sf),h[1]), self.fns[i])
 
       drawhist1d(hist=h)
